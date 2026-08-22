@@ -7,6 +7,9 @@ no data leaves your machine — the whole game runs as static files.
 
 Live: https://amylyn95-jpg.github.io/Battleship-V1/ (published by the Pages workflow on every push to `main`)
 
+This repo also hosts the Devin Sales Academy app at
+https://amylyn95-jpg.github.io/Battleship-V1/academy/ — see [`devin-sales-academy/`](devin-sales-academy/README.md).
+
 Place your five ships (click to place, **R** to rotate, or hit **Random fleet**),
 press **Start battle**, then click the enemy grid to fire. First fleet sunk loses.
 An in-progress game survives a page refresh.

@@ -6,6 +6,10 @@ push back.
 
 The loop: **learn → practise → get graded → understand why → try again → track improvement.**
 
+Live: https://amylyn95-jpg.github.io/Battleship-V1/academy/ (published by the Pages
+workflow on every push to `main`; the app is exported as static files, so there is
+no server and progress stays in your browser)
+
 ## What is in it
 
 | Page | What it does |

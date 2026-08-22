@@ -29,6 +29,16 @@ jobs:
       - run: npm run build
         env:
           PAGES_BASE: /${{ github.event.repository.name }}/
+      # The sales academy is a separate app published under /academy/ of the same site.
+      - run: npm ci
+        working-directory: devin-sales-academy
+      - run: npm test
+        working-directory: devin-sales-academy
+      - run: npm run build
+        working-directory: devin-sales-academy
+        env:
+          PAGES_BASE_PATH: /${{ github.event.repository.name }}/academy
+      - run: cp -r devin-sales-academy/out dist/academy
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
