@@ -269,7 +269,8 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(4, 14, 24, 0.82);
+  /* Light dim only: the enemy fleet is revealed behind this card at game over. */
+  background: rgba(4, 14, 24, 0.4);
   z-index: 10;
 }
 
