@@ -1,4 +1,4 @@
-import { inBounds, key, sameCoord } from './board';
+import { inBounds, key } from './board';
 import { BOARD_SIZE, type Board, type Coord, type Difficulty, type ShotOutcome } from './types';
 
 /**
@@ -64,7 +64,7 @@ export function nextShot(state: AiState, board: Board, random: () => number = Ma
 }
 
 /** Same-axis extensions of a wounded ship, which beat plain adjacency once we know its direction. */
-function alignedCandidates(hits: Coord[]): Coord[] {
+export function alignedCandidates(hits: Coord[]): Coord[] {
   if (hits.length < 2) return [];
   const horizontal = hits.every((hit) => hit.row === hits[0].row);
   const vertical = hits.every((hit) => hit.col === hits[0].col);
@@ -85,29 +85,68 @@ function alignedCandidates(hits: Coord[]): Coord[] {
   return [];
 }
 
-/** Folds the result of the AI's shot back into its state. */
-export function registerOutcome(state: AiState, target: Coord, outcome: ShotOutcome): AiState {
-  const withoutTarget = state.queue.filter((cell) => !sameCoord(cell, target));
+/**
+ * Folds the result of the AI's shot back into its state. `board` is the board *after* the shot,
+ * used only to keep already-fired cells out of the queue.
+ */
+export function registerOutcome(
+  state: AiState,
+  target: Coord,
+  outcome: ShotOutcome,
+  board: Board,
+): AiState {
+  const viable = (cell: Coord) => untried(board, cell);
+  const rebuild = (hits: Coord[], extra: Coord[] = []): Coord[] => {
+    const seen = new Set<string>();
+    const queue: Coord[] = [];
+    for (const cell of [...alignedCandidates(hits), ...hits.flatMap(neighbours), ...extra]) {
+      if (seen.has(key(cell)) || !viable(cell)) continue;
+      seen.add(key(cell));
+      queue.push(cell);
+    }
+    return queue;
+  };
 
   if (outcome.kind === 'sunk') {
-    // The wounded-ship trail is resolved; drop it and go back to hunting.
-    return { ...state, queue: [], activeHits: [] };
+    // The sunk ship's cells are a contiguous run of known length through the killing shot.
+    // Any other hit still on the trail belongs to a *different* ship, so keep hunting it.
+    const trail = [...state.activeHits, target];
+    const sunkCells = new Set(sunkRun(trail, target, outcome.shipSize).map(key));
+    const orphans = state.activeHits.filter((hit) => !sunkCells.has(key(hit)));
+    return { ...state, activeHits: orphans, queue: rebuild(orphans) };
   }
   if (outcome.kind !== 'hit') {
-    return { ...state, queue: withoutTarget };
+    return { ...state, queue: state.queue.filter((cell) => viable(cell)) };
   }
 
+  // Prefer extending the known axis, but always keep plain adjacency as a fallback: the hits may
+  // belong to two different ships, in which case the axis guess is wrong and its ends are dead.
   const activeHits = [...state.activeHits, target];
-  const aligned = alignedCandidates(activeHits);
-  // Once the ship's axis is known, only its two ends can extend it.
-  const candidates = aligned.length > 0 ? aligned : [...withoutTarget, ...neighbours(target)];
+  return { ...state, activeHits, queue: rebuild(activeHits, state.queue) };
+}
 
-  const seen = new Set(activeHits.map(key));
-  const queue: Coord[] = [];
-  for (const cell of candidates) {
-    if (seen.has(key(cell))) continue;
-    seen.add(key(cell));
-    queue.push(cell);
+/**
+ * The cells of the ship that just sank: the contiguous run of `size` hits through `killingShot`.
+ * Falls back to the killing shot alone when the trail is ambiguous.
+ */
+function sunkRun(hits: Coord[], killingShot: Coord, size: number): Coord[] {
+  const hitKeys = new Set(hits.map(key));
+  const walk = (step: Coord): Coord[] => {
+    const run: Coord[] = [];
+    let cursor = { row: killingShot.row + step.row, col: killingShot.col + step.col };
+    while (hitKeys.has(key(cursor))) {
+      run.push(cursor);
+      cursor = { row: cursor.row + step.row, col: cursor.col + step.col };
+    }
+    return run;
+  };
+
+  for (const [back, forward] of [
+    [walk({ row: 0, col: -1 }), walk({ row: 0, col: 1 })],
+    [walk({ row: -1, col: 0 }), walk({ row: 1, col: 0 })],
+  ]) {
+    const run = [...back.reverse(), killingShot, ...forward];
+    if (run.length >= size) return run;
   }
-  return { ...state, queue, activeHits };
+  return [killingShot];
 }

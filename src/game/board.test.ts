@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allShipsSunk,
   canPlace,
+  clampStart,
   emptyBoard,
   fireAt,
   occupiedCells,
@@ -26,6 +27,12 @@ describe('placement', () => {
       { row: 3, col: 4 },
       { row: 4, col: 4 },
     ]);
+  });
+
+  it('clamps an anchor so the ship stays fully on the board', () => {
+    expect(clampStart({ row: 0, col: 9 }, 5, 'horizontal')).toEqual({ row: 0, col: 5 });
+    expect(clampStart({ row: 9, col: 3 }, 4, 'vertical')).toEqual({ row: 6, col: 3 });
+    expect(clampStart({ row: 2, col: 2 }, 3, 'horizontal')).toEqual({ row: 2, col: 2 });
   });
 
   it('rejects ships that would run off the board', () => {

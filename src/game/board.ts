@@ -27,6 +27,17 @@ export function shipCells(start: Coord, size: number, orientation: Orientation):
   );
 }
 
+/**
+ * Pulls an anchor back so a ship of `size` stays fully on the board. Hovering near the right or
+ * bottom edge then previews and places a whole ship instead of one clipped to the edge.
+ */
+export function clampStart(start: Coord, size: number, orientation: Orientation): Coord {
+  const limit = BOARD_SIZE - size;
+  return orientation === 'horizontal'
+    ? { row: start.row, col: Math.min(start.col, limit) }
+    : { row: Math.min(start.row, limit), col: start.col };
+}
+
 export function occupiedCells(board: Board): Set<string> {
   const occupied = new Set<string>();
   for (const ship of board.ships) {
@@ -113,7 +124,12 @@ export function fireAt(board: Board, target: Coord): { board: Board; outcome: Sh
   return {
     board: nextBoard,
     outcome: isSunk(updatedShip)
-      ? { kind: 'sunk', shipId: updatedShip.id, shipName: updatedShip.name }
+      ? {
+          kind: 'sunk',
+          shipId: updatedShip.id,
+          shipName: updatedShip.name,
+          shipSize: updatedShip.size,
+        }
       : { kind: 'hit', shipId: updatedShip.id },
   };
 }

@@ -39,7 +39,7 @@ export type ShotOutcome =
   | { kind: 'invalid'; reason: 'off-board' | 'repeat' }
   | { kind: 'miss' }
   | { kind: 'hit'; shipId: string }
-  | { kind: 'sunk'; shipId: string; shipName: string };
+  | { kind: 'sunk'; shipId: string; shipName: string; shipSize: number };
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 

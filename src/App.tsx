@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { FleetStatus } from './components/FleetStatus';
 import { Grid } from './components/Grid';
-import { canPlace, emptyBoard, placeShip, randomBoard, shipCells } from './game/board';
+import {
+  canPlace,
+  clampStart,
+  emptyBoard,
+  placeShip,
+  randomBoard,
+  shipCells,
+} from './game/board';
 import { aiFire, createGame, playerFire, startBattle, type GameState } from './game/engine';
 import { FLEET, type Coord, type Difficulty, type Orientation } from './game/types';
 
@@ -24,13 +31,19 @@ export default function App() {
   const nextShip = FLEET[placement.ships.length];
   const placementComplete = placement.ships.length === FLEET.length;
 
-  const preview = useMemo(() => {
-    if (!hover || !nextShip) return [];
-    return shipCells(hover, nextShip.size, orientation);
-  }, [hover, nextShip, orientation]);
+  // Anchors are clamped so the ghost ship is always drawn at full length, on-board.
+  const anchor = useMemo(
+    () => (hover && nextShip ? clampStart(hover, nextShip.size, orientation) : null),
+    [hover, nextShip, orientation],
+  );
+
+  const preview = useMemo(
+    () => (anchor && nextShip ? shipCells(anchor, nextShip.size, orientation) : []),
+    [anchor, nextShip, orientation],
+  );
 
   const previewValid = Boolean(
-    hover && nextShip && canPlace(placement, hover, nextShip.size, orientation),
+    anchor && nextShip && canPlace(placement, anchor, nextShip.size, orientation),
   );
 
   const newGame = useCallback((level: Difficulty) => {
@@ -43,7 +56,12 @@ export default function App() {
 
   const handlePlace = (coord: Coord) => {
     if (!nextShip) return;
-    const next = placeShip(placement, nextShip, coord, orientation);
+    const next = placeShip(
+      placement,
+      nextShip,
+      clampStart(coord, nextShip.size, orientation),
+      orientation,
+    );
     if (next) setPlacement(next);
   };
 
@@ -156,7 +174,11 @@ export default function App() {
                 interactive={game.phase === 'playerTurn'}
                 onCellClick={(coord) => setGame((current) => playerFire(current, coord))}
               />
-              <FleetStatus board={game.aiBoard} title="Enemy fleet" revealDamage={false} />
+              <FleetStatus
+                board={game.aiBoard}
+                title="Enemy fleet"
+                revealDamage={game.phase === 'gameOver'}
+              />
             </div>
             <div className="board-column">
               <Grid board={game.playerBoard} revealShips label="Your waters" />

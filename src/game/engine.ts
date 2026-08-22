@@ -81,7 +81,7 @@ export function aiFire(state: GameState, random: () => number = Math.random): Ga
 
   const target = nextShot(state.ai, state.playerBoard, random);
   const { board: playerBoard, outcome } = fireAt(state.playerBoard, target);
-  const ai = registerOutcome(state.ai, target, outcome);
+  const ai = registerOutcome(state.ai, target, outcome, playerBoard);
 
   const log = [describe('Enemy', target, outcome), ...state.log];
   if (allShipsSunk(playerBoard)) {

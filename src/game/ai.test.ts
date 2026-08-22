@@ -29,7 +29,7 @@ describe('ai targeting', () => {
       const result = fireAt(board, target);
       expect(result.outcome.kind).not.toBe('invalid');
       board = result.board;
-      ai = registerOutcome(ai, target, result.outcome);
+      ai = registerOutcome(ai, target, result.outcome, board);
     }
     expect(fired.size).toBe(100);
   });
@@ -38,7 +38,7 @@ describe('ai targeting', () => {
     const board = placeShip(emptyBoard(), { name: 'Cruiser', size: 3 }, { row: 4, col: 4 }, 'horizontal')!;
     const target: Coord = { row: 4, col: 4 };
     const { board: afterHit, outcome } = fireAt(board, target);
-    const ai = registerOutcome(createAi('normal'), target, outcome);
+    const ai = registerOutcome(createAi('normal'), target, outcome, afterHit);
 
     const follow = nextShot(ai, afterHit, seededRandom(1));
     const adjacency = Math.abs(follow.row - target.row) + Math.abs(follow.col - target.col);
@@ -55,7 +55,7 @@ describe('ai targeting', () => {
     ]) {
       const result = fireAt(board, target);
       board = result.board;
-      ai = registerOutcome(ai, target, result.outcome);
+      ai = registerOutcome(ai, target, result.outcome, board);
     }
 
     const next = nextShot(ai, board, seededRandom(3));
@@ -72,10 +72,57 @@ describe('ai targeting', () => {
     ]) {
       const result = fireAt(board, target);
       board = result.board;
-      ai = registerOutcome(ai, target, result.outcome);
+      ai = registerOutcome(ai, target, result.outcome, board);
     }
     expect(ai.queue).toHaveLength(0);
     expect(ai.activeHits).toHaveLength(0);
+  });
+
+  it('keeps hunting a wounded ship whose hits interleave with another ship', () => {
+    // Regression: hits on two different ships used to be treated as one, so the inferred axis
+    // pointed at already-fired cells and the AI abandoned both trails.
+    let board = placeShip(emptyBoard(), { name: 'Destroyer', size: 2 }, { row: 8, col: 4 }, 'horizontal')!;
+    board = placeShip(board, { name: 'Carrier', size: 5 }, { row: 9, col: 5 }, 'horizontal')!;
+    let ai = createAi('normal');
+
+    for (const target of [
+      { row: 8, col: 5 }, // hits the Destroyer
+      { row: 7, col: 5 }, // miss
+      { row: 9, col: 5 }, // hits the Carrier: two hits, same column, different ships
+    ]) {
+      const result = fireAt(board, target);
+      board = result.board;
+      ai = registerOutcome(ai, target, result.outcome, board);
+    }
+
+    const next = nextShot(ai, board, seededRandom(9));
+    const adjacentToAHit = ai.activeHits.some(
+      (hit) => Math.abs(hit.row - next.row) + Math.abs(hit.col - next.col) === 1,
+    );
+    expect(adjacentToAHit).toBe(true);
+  });
+
+  it('keeps chasing a second wounded ship after the first one sinks', () => {
+    // The Destroyer sinks while the Carrier is already wounded; that hit must not be forgotten.
+    let board = placeShip(emptyBoard(), { name: 'Destroyer', size: 2 }, { row: 8, col: 4 }, 'horizontal')!;
+    board = placeShip(board, { name: 'Carrier', size: 5 }, { row: 9, col: 5 }, 'horizontal')!;
+    let ai = createAi('normal');
+
+    for (const target of [
+      { row: 9, col: 5 }, // wounds the Carrier
+      { row: 8, col: 5 }, // wounds the Destroyer
+      { row: 8, col: 4 }, // sinks the Destroyer
+    ]) {
+      const result = fireAt(board, target);
+      board = result.board;
+      ai = registerOutcome(ai, target, result.outcome, board);
+    }
+
+    expect(ai.activeHits).toEqual([{ row: 9, col: 5 }]);
+    // Either horizontal neighbour of the surviving hit is a legitimate follow-up.
+    const next = nextShot(ai, board, seededRandom(5));
+    expect(next.row).toBe(9);
+    expect([4, 6]).toContain(next.col);
   });
 
   it('hard difficulty needs fewer shots than easy to clear a fleet', () => {
@@ -87,7 +134,7 @@ describe('ai targeting', () => {
         const target = nextShot(ai, board, random);
         const result = fireAt(board, target);
         board = result.board;
-        ai = registerOutcome(ai, target, result.outcome);
+        ai = registerOutcome(ai, target, result.outcome, board);
         if (board.ships.every((ship) => ship.hits.length === ship.size)) break;
       }
       return shotsTaken(board);
