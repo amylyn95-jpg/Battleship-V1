@@ -2,7 +2,7 @@
   --sea: #0d2b45;
   --sea-light: #1b4a6b;
   --grid-line: #2f6690;
-  --ship: #5c6b73;
+  --ship: #8a99a3;
   --hit: #e05d3a;
   --miss: #9fb8c8;
   --sunk: #8b2c1a;
@@ -183,6 +183,7 @@ main {
 
 .cell.ship {
   background: var(--ship);
+  box-shadow: inset 0 0 0 1px rgba(7, 26, 43, 0.55);
 }
 
 .cell.miss {

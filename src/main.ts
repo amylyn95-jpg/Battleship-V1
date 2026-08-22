@@ -87,7 +87,8 @@ function lastShotOf(shots: readonly ShotResult[]): Coord | null {
 
 function render(): void {
   paintBoard(playerCells, session.playerBoard, true, lastShotOf(session.aiShots));
-  paintBoard(aiCells, session.aiBoard, false, lastShotOf(session.playerShots));
+  // The enemy fleet is only revealed once the game is over.
+  paintBoard(aiCells, session.aiBoard, session.phase === "gameover", lastShotOf(session.playerShots));
   paintFleet(dom.playerFleet, session.playerBoard.ships);
   paintFleet(dom.aiFleet, session.aiBoard.ships);
 
