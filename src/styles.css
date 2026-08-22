@@ -1,0 +1,298 @@
+:root {
+  --sea: #0d2b45;
+  --sea-light: #1b4a6b;
+  --grid-line: #2f6690;
+  --ship: #5c6b73;
+  --hit: #e05d3a;
+  --miss: #9fb8c8;
+  --sunk: #8b2c1a;
+  --text: #eaf4fb;
+  --accent: #4fc3a1;
+  --invalid: #c94c4c;
+  --cell: clamp(24px, 7.5vw, 38px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at 20% 0%, #14456b 0%, #071a2b 60%);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  gap: 0.75rem;
+}
+
+.topbar {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h2 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+button,
+select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--grid-line);
+  background: var(--sea-light);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+select:hover {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+select:focus-visible,
+.cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+main {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.panel {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--grid-line);
+  border-radius: 8px;
+  background: rgba(13, 43, 69, 0.6);
+}
+
+.panel.hidden,
+.hidden {
+  display: none;
+}
+
+.prompt {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.placement-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.4em;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.status .hit-text {
+  color: var(--hit);
+  font-weight: 700;
+}
+
+.status .sunk-text {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.boards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.board-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(10, var(--cell));
+  grid-template-rows: repeat(10, var(--cell));
+  gap: 2px;
+  padding: 2px;
+  background: var(--grid-line);
+  border-radius: 4px;
+}
+
+.cell {
+  border: none;
+  padding: 0;
+  border-radius: 2px;
+  background: var(--sea);
+  cursor: default;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.board.targetable .cell:not(.fired) {
+  cursor: crosshair;
+}
+
+.board.targetable .cell:not(.fired):hover {
+  background: var(--sea-light);
+}
+
+.cell.ship {
+  background: var(--ship);
+}
+
+.cell.miss {
+  background: var(--miss);
+}
+
+.cell.hit {
+  background: var(--hit);
+  animation: pop 260ms ease;
+}
+
+.cell.sunk {
+  background: var(--sunk);
+}
+
+.cell.preview {
+  background: var(--accent);
+}
+
+.cell.preview-invalid {
+  background: var(--invalid);
+}
+
+.cell.last-shot {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    transition: none;
+  }
+  .cell.hit {
+    animation: none;
+  }
+}
+
+.fleet {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  max-width: calc(var(--cell) * 10);
+}
+
+.fleet li {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--grid-line);
+  border-radius: 999px;
+  opacity: 0.9;
+}
+
+.fleet li.sunk {
+  text-decoration: line-through;
+  background: var(--sunk);
+  border-color: var(--sunk);
+}
+
+/* `.hidden` is declared earlier in this file, so on its own it loses to the
+   `display: flex` below and leaves an invisible overlay swallowing clicks. */
+.overlay.hidden {
+  display: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 14, 24, 0.82);
+  z-index: 10;
+}
+
+.overlay-card {
+  background: var(--sea);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  max-width: 90vw;
+}
+
+.overlay-card h2 {
+  font-size: 1.3rem;
+}
+
+footer {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .boards {
+    gap: 1rem;
+  }
+}

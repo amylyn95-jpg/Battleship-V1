@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Battleship</title>
+    <meta name="description" content="Play Battleship in your browser against an AI opponent." />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Battleship</h1>
+      <div class="controls">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty" aria-label="AI difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+        <button id="new-game" type="button">New game</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="placement-panel" class="panel">
+        <p id="placement-prompt" class="prompt"></p>
+        <div class="placement-controls">
+          <button id="rotate" type="button">Rotate <kbd>R</kbd></button>
+          <button id="random-fleet" type="button">Random fleet</button>
+          <button id="reset-fleet" type="button">Clear</button>
+          <button id="start-battle" type="button" disabled>Start battle</button>
+        </div>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <div class="boards">
+        <section class="board-wrap">
+          <h2>Your waters</h2>
+          <div id="player-board" class="board" role="grid" aria-label="Your fleet"></div>
+          <ul id="player-fleet" class="fleet"></ul>
+        </section>
+
+        <section class="board-wrap">
+          <h2>Enemy waters</h2>
+          <div id="ai-board" class="board" role="grid" aria-label="Enemy waters"></div>
+          <ul id="ai-fleet" class="fleet"></ul>
+        </section>
+      </div>
+    </main>
+
+    <div id="gameover" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
+      <div class="overlay-card">
+        <h2 id="gameover-title"></h2>
+        <p id="gameover-stats"></p>
+        <button id="rematch" type="button">Rematch</button>
+      </div>
+    </div>
+
+    <footer>
+      <p>Click a cell to fire. Keyboard: arrow keys to move, Enter or Space to fire.</p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
