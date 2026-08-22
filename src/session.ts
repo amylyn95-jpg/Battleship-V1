@@ -1,14 +1,24 @@
-import { emptyBoard, isFleetComplete, randomFleet } from "./board.js";
+import {
+  alreadyFiredAt,
+  coordKey,
+  emptyBoard,
+  isFleetComplete,
+  randomFleet,
+  sameCoord,
+} from "./board.js";
 import { createAi, nextShot, recordResult } from "./ai.js";
-import { fire } from "./game.js";
-import { FLEET } from "./types.js";
+import { fire, salvoSize } from "./game.js";
+import { BOARD_SIZE, FLEET } from "./types.js";
 import type { AiState } from "./ai.js";
-import type { Board, Coord, Difficulty, Phase, Player, ShipSpec, ShotResult } from "./types.js";
+import type { Board, Coord, Difficulty, Mode, Phase, Player, ShipSpec, ShotResult } from "./types.js";
 
 export interface Session {
   phase: Phase;
   difficulty: Difficulty;
+  mode: Mode;
   turn: Player;
+  /** Salvo mode only: cells the human has picked but not yet fired. */
+  pendingTargets: Coord[];
   /** The human's board; the AI fires at this one. */
   playerBoard: Board;
   /** The AI's board; the human fires at this one. */
@@ -19,11 +29,13 @@ export interface Session {
   winner: Player | null;
 }
 
-export function newSession(difficulty: Difficulty): Session {
+export function newSession(difficulty: Difficulty, mode: Mode = "classic"): Session {
   return {
     phase: "placement",
     difficulty,
+    mode,
     turn: "human",
+    pendingTargets: [],
     playerBoard: emptyBoard(),
     aiBoard: randomFleet(),
     ai: createAi(difficulty),
@@ -43,6 +55,124 @@ export function startBattle(session: Session): void {
   }
   session.phase = "playing";
   session.turn = "human";
+  session.pendingTargets = [];
+}
+
+/** How many shots the human gets this turn; always 1 outside salvo mode. */
+export function playerSalvoSize(session: Session): number {
+  return session.mode === "salvo" ? salvoSize(session.playerBoard) : 1;
+}
+
+/** How many shots the AI gets this turn; always 1 outside salvo mode. */
+export function aiSalvoSize(session: Session): number {
+  return session.mode === "salvo" ? salvoSize(session.aiBoard) : 1;
+}
+
+/** Adds or removes one of the human's salvo targets. */
+export function toggleTarget(session: Session, coord: Coord): void {
+  if (session.phase !== "playing" || session.turn !== "human") return;
+  if (alreadyFiredAt(session.aiBoard, coord)) return;
+
+  const existing = session.pendingTargets.findIndex((c) => sameCoord(c, coord));
+  if (existing >= 0) {
+    session.pendingTargets = session.pendingTargets.filter((_, i) => i !== existing);
+    return;
+  }
+  if (session.pendingTargets.length >= playerSalvoSize(session)) return;
+  session.pendingTargets = [...session.pendingTargets, coord];
+}
+
+/**
+ * Tops the human's salvo up to full size with random unfired cells, used when
+ * the shot clock expires mid-selection.
+ */
+export function fillTargets(session: Session, random: () => number = Math.random): void {
+  const wanted = playerSalvoSize(session);
+  const taken = new Set(session.pendingTargets.map(coordKey));
+  const free: Coord[] = [];
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      const coord = { row, col };
+      if (!alreadyFiredAt(session.aiBoard, coord) && !taken.has(coordKey(coord))) free.push(coord);
+    }
+  }
+  while (session.pendingTargets.length < wanted && free.length > 0) {
+    const [choice] = free.splice(Math.floor(random() * free.length), 1);
+    session.pendingTargets = [...session.pendingTargets, choice!];
+  }
+}
+
+/** Resolves every cell the human selected, in one volley. */
+export function playerSalvo(session: Session): ShotResult[] {
+  if (session.phase !== "playing") throw new Error("Not in the playing phase");
+  if (session.turn !== "human") throw new Error("Not the player's turn");
+  if (session.pendingTargets.length === 0) throw new Error("No targets selected");
+  if (session.pendingTargets.length > playerSalvoSize(session)) {
+    throw new Error("More targets than surviving ships");
+  }
+
+  const results: ShotResult[] = [];
+  for (const coord of session.pendingTargets) {
+    const { board, result } = fire(session.aiBoard, coord);
+    session.aiBoard = board;
+    session.playerShots.push(result);
+    results.push(result);
+    if (result.fleetDestroyed) break;
+  }
+  session.pendingTargets = [];
+
+  if (results.some((r) => r.fleetDestroyed)) {
+    session.phase = "gameover";
+    session.winner = "human";
+  } else {
+    session.turn = "ai";
+  }
+  return results;
+}
+
+/**
+ * The AI commits to its whole salvo before seeing any outcome, the same
+ * constraint the human plays under. Provisional entries stop it spending two
+ * shots of one salvo on the same cell.
+ */
+function chooseSalvo(state: AiState, count: number, random: () => number): Coord[] {
+  const probe: AiState = { ...state, tried: new Map(state.tried), queue: [...state.queue] };
+  const coords: Coord[] = [];
+  for (let i = 0; i < count; i++) {
+    let coord: Coord;
+    try {
+      coord = nextShot(probe, random);
+    } catch {
+      break;
+    }
+    coords.push(coord);
+    probe.tried.set(coordKey(coord), false);
+    probe.queue = probe.queue.filter((c) => !sameCoord(c, coord));
+  }
+  return coords;
+}
+
+export function aiSalvo(session: Session, random: () => number = Math.random): ShotResult[] {
+  if (session.phase !== "playing") throw new Error("Not in the playing phase");
+  if (session.turn !== "ai") throw new Error("Not the AI's turn");
+
+  const results: ShotResult[] = [];
+  for (const coord of chooseSalvo(session.ai, aiSalvoSize(session), random)) {
+    const { board, result } = fire(session.playerBoard, coord);
+    session.playerBoard = board;
+    session.aiShots.push(result);
+    recordResult(session.ai, result);
+    results.push(result);
+    if (result.fleetDestroyed) break;
+  }
+
+  if (results.some((r) => r.fleetDestroyed)) {
+    session.phase = "gameover";
+    session.winner = "ai";
+  } else {
+    session.turn = "human";
+  }
+  return results;
 }
 
 /** Resolves the human's shot at the AI's board. */
@@ -88,6 +218,9 @@ const STORAGE_KEY = "battleship.session.v1";
 interface SerializedSession {
   phase: Phase;
   difficulty: Difficulty;
+  /** Absent in saves written before salvo mode existed. */
+  mode?: Mode;
+  pendingTargets?: Coord[];
   turn: Player;
   playerBoard: Board;
   aiBoard: Board;
@@ -108,6 +241,8 @@ export function serialize(session: Session): string {
   const payload: SerializedSession = {
     phase: session.phase,
     difficulty: session.difficulty,
+    mode: session.mode,
+    pendingTargets: session.pendingTargets,
     turn: session.turn,
     playerBoard: session.playerBoard,
     aiBoard: session.aiBoard,
@@ -131,6 +266,8 @@ export function deserialize(raw: string): Session {
   return {
     phase: data.phase,
     difficulty: data.difficulty,
+    mode: data.mode ?? "classic",
+    pendingTargets: data.pendingTargets ?? [],
     turn: data.turn,
     playerBoard: data.playerBoard,
     aiBoard: data.aiBoard,

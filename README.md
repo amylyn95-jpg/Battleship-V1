@@ -11,6 +11,13 @@ Place your five ships (click to place, **R** to rotate, or hit **Random fleet**)
 press **Start battle**, then click the enemy grid to fire. First fleet sunk loses.
 An in-progress game survives a page refresh.
 
+## Modes
+
+| Mode    | Rules                                                                                                                                                                                              |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Classic | One shot per turn; every shot is marked hit or miss immediately.                                                                                                                                     |
+| Salvo   | One shot per surviving ship each turn, on a 20 second clock. You are told only how many of the volley hit — splashes stay grey until a ship sinks. Run out of time and the rest of the salvo fires blind. |
+
 ## Difficulty
 
 | Level  | How the opponent picks its shot                                                                 |

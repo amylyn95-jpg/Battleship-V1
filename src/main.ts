@@ -3,16 +3,21 @@ import { createAi } from "./ai.js";
 import { accuracy, shotsFired } from "./game.js";
 import {
   aiFire,
+  aiSalvo,
   clearSaved,
+  fillTargets,
   load,
   newSession,
   nextShipToPlace,
   playerFire,
+  playerSalvo,
+  playerSalvoSize,
   save,
   startBattle,
+  toggleTarget,
 } from "./session.js";
 import { BOARD_SIZE } from "./types.js";
-import type { Coord, Difficulty, Orientation, Phase, ShotResult } from "./types.js";
+import type { Coord, Difficulty, Mode, Orientation, Phase, ShotResult } from "./types.js";
 import {
   buildGrid,
   cellIndex,
@@ -21,10 +26,13 @@ import {
   paintBoard,
   paintFleet,
   showPreview,
+  showTargets,
 } from "./ui.js";
 import type { Session } from "./session.js";
 
 const AI_THINK_MS = 550;
+/** Salvo mode shot clock. */
+const TURN_SECONDS = 20;
 
 function required<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -45,6 +53,11 @@ const dom = {
   resetFleet: required<HTMLButtonElement>("reset-fleet"),
   startBattle: required<HTMLButtonElement>("start-battle"),
   difficulty: required<HTMLSelectElement>("difficulty"),
+  mode: required<HTMLSelectElement>("mode"),
+  salvoBar: required<HTMLElement>("salvo-bar"),
+  salvoCount: required<HTMLSpanElement>("salvo-count"),
+  salvoTimer: required<HTMLSpanElement>("salvo-timer"),
+  fireSalvo: required<HTMLButtonElement>("fire-salvo"),
   newGame: required<HTMLButtonElement>("new-game"),
   gameover: required<HTMLDivElement>("gameover"),
   gameoverTitle: required<HTMLHeadingElement>("gameover-title"),
@@ -57,14 +70,34 @@ let orientation: Orientation = "horizontal";
 let cursor: Coord = { row: 0, col: 0 };
 /** True while the AI's delayed shot is pending, to lock out player input. */
 let aiThinking = false;
+/** Salvo mode: id of the shot-clock interval, and when the clock runs out. */
+let clockTimer: number | null = null;
+let clockEndsAt = 0;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
 
 dom.difficulty.value = session.difficulty;
+dom.mode.value = session.mode;
 
 function setStatus(html: string): void {
   dom.status.innerHTML = html;
+}
+
+/**
+ * Salvo feedback is deliberately vague: only the number of hits, never which
+ * shots landed. Sinkings are still announced because the board reveals them.
+ */
+function describeSalvo(results: readonly ShotResult[], actor: "Your" | "Enemy"): string {
+  const hits = results.filter((r) => r.hit).length;
+  const sunk = results.filter((r) => r.sunk).map((r) => r.sunk!.name);
+  const tally =
+    hits === 0
+      ? `${actor} salvo of ${results.length}: all misses.`
+      : `${actor} salvo of ${results.length}: <span class="hit-text">${hits} hit${hits === 1 ? "" : "s"}</span>!`;
+  if (sunk.length === 0) return tally;
+  const owner = actor === "Your" ? "Sank the" : "They sank your";
+  return `${tally} <span class="sunk-text">${owner} ${sunk.join(" and ")}</span>!`;
 }
 
 function describe(result: ShotResult, actor: "You" | "The enemy"): string {
@@ -86,9 +119,18 @@ function lastShotOf(shots: readonly ShotResult[]): Coord | null {
 }
 
 function render(): void {
+  const salvo = session.mode === "salvo";
   paintBoard(playerCells, session.playerBoard, true, lastShotOf(session.aiShots));
-  // The enemy fleet is only revealed once the game is over.
-  paintBoard(aiCells, session.aiBoard, session.phase === "gameover", lastShotOf(session.playerShots));
+  // The enemy fleet is only revealed once the game is over. In salvo mode the
+  // outcome of each shot stays hidden until the ship it belongs to sinks.
+  paintBoard(
+    aiCells,
+    session.aiBoard,
+    session.phase === "gameover",
+    lastShotOf(session.playerShots),
+    salvo,
+  );
+  if (salvo) showTargets(aiCells, session.pendingTargets);
   paintFleet(dom.playerFleet, session.playerBoard.ships);
   paintFleet(dom.aiFleet, session.aiBoard.ships);
 
@@ -104,9 +146,18 @@ function render(): void {
       : "Fleet ready. Start the battle!";
   }
 
+  const playerTurn = session.phase === "playing" && session.turn === "human" && !aiThinking;
   for (const cell of aiCells) {
     const fired = cell.classList.contains("fired");
-    cell.disabled = session.phase !== "playing" || session.turn !== "human" || fired || aiThinking;
+    cell.disabled = !playerTurn || fired;
+  }
+
+  dom.salvoBar.classList.toggle("hidden", !salvo || session.phase !== "playing");
+  if (salvo) {
+    const picked = session.pendingTargets.length;
+    dom.salvoCount.textContent = `Targets ${picked}/${playerSalvoSize(session)}`;
+    dom.fireSalvo.disabled = !playerTurn || picked === 0;
+    if (!playerTurn) dom.salvoTimer.textContent = "--";
   }
   for (const cell of playerCells) {
     cell.disabled = session.phase !== "placement";
@@ -150,8 +201,53 @@ function previewAt(coord: Coord): void {
   showPreview(playerCells, cells, canPlace(session.playerBoard, spec, coord, orientation));
 }
 
+function stopClock(): void {
+  if (clockTimer !== null) window.clearInterval(clockTimer);
+  clockTimer = null;
+}
+
+function tickClock(): void {
+  const left = Math.max(0, Math.ceil((clockEndsAt - Date.now()) / 1000));
+  dom.salvoTimer.textContent = `${left}s`;
+  dom.salvoTimer.classList.toggle("urgent", left <= 5);
+  if (left > 0) return;
+  stopClock();
+  // Out of time: the rest of the salvo is fired blind.
+  fillTargets(session);
+  fireSalvo(true);
+}
+
+/** Starts the shot clock for the human's salvo turn. */
+function startClock(): void {
+  stopClock();
+  if (session.mode !== "salvo" || session.phase !== "playing" || session.turn !== "human") return;
+  clockEndsAt = Date.now() + TURN_SECONDS * 1000;
+  tickClock();
+  clockTimer = window.setInterval(tickClock, 200);
+}
+
+function fireSalvo(timedOut = false): void {
+  if (session.phase !== "playing" || session.turn !== "human" || aiThinking) return;
+  if (session.pendingTargets.length === 0) return;
+  stopClock();
+
+  const results = playerSalvo(session);
+  const prefix = timedOut ? "Time! " : "";
+  setStatus(prefix + describeSalvo(results, "Your"));
+  render();
+
+  if (currentPhase() === "gameover") return;
+  scheduleAiTurn();
+}
+
 function handleFireClick(coord: Coord): void {
   if (session.phase !== "playing" || session.turn !== "human" || aiThinking) return;
+
+  if (session.mode === "salvo") {
+    toggleTarget(session, coord);
+    render();
+    return;
+  }
 
   let result: ShotResult;
   try {
@@ -177,15 +273,25 @@ function scheduleAiTurn(): void {
       render();
       return;
     }
+    if (session.mode === "salvo") {
+      setStatus(describeSalvo(aiSalvo(session), "Enemy"));
+      render();
+      startClock();
+      return;
+    }
     const result = aiFire(session);
     setStatus(describe(result, "The enemy"));
     render();
   }, AI_THINK_MS);
 }
 
-function resetGame(difficulty: Difficulty = session.difficulty): void {
+function resetGame(
+  difficulty: Difficulty = session.difficulty,
+  mode: Mode = session.mode,
+): void {
   clearSaved();
-  session = newSession(difficulty);
+  stopClock();
+  session = newSession(difficulty, mode);
   aiThinking = false;
   orientation = "horizontal";
   setStatus("Place your fleet to begin.");
@@ -215,11 +321,35 @@ dom.resetFleet.addEventListener("click", () => {
 dom.startBattle.addEventListener("click", () => {
   if (session.phase !== "placement" || !isFleetComplete(session.playerBoard)) return;
   startBattle(session);
-  setStatus("Battle stations — fire at the enemy waters.");
+  setStatus(
+    session.mode === "salvo"
+      ? "Battle stations — pick one target per surviving ship, then fire."
+      : "Battle stations — fire at the enemy waters.",
+  );
   render();
+  startClock();
 });
 
-dom.newGame.addEventListener("click", () => resetGame(dom.difficulty.value as Difficulty));
+dom.fireSalvo.addEventListener("click", () => fireSalvo());
+
+dom.mode.addEventListener("change", () => {
+  const mode = dom.mode.value as Mode;
+  if (session.phase === "placement") {
+    session.mode = mode;
+    setStatus(
+      mode === "salvo"
+        ? "Salvo mode: one shot per surviving ship each turn, on a 20 second clock."
+        : "Classic mode: one shot per turn.",
+    );
+    render();
+  } else {
+    resetGame(session.difficulty, mode);
+  }
+});
+
+dom.newGame.addEventListener("click", () =>
+  resetGame(dom.difficulty.value as Difficulty, dom.mode.value as Mode),
+);
 dom.rematch.addEventListener("click", () => resetGame());
 
 dom.difficulty.addEventListener("change", () => {
@@ -258,6 +388,10 @@ document.addEventListener("keydown", (event) => {
     dom.rotate.click();
     return;
   }
+  if (event.key.toLowerCase() === "f" && session.mode === "salvo") {
+    fireSalvo();
+    return;
+  }
   const deltas: Record<string, Coord> = {
     ArrowUp: { row: -1, col: 0 },
     ArrowDown: { row: 1, col: 0 },
@@ -290,4 +424,7 @@ render();
 // with the board locked and nothing left to trigger the AI's turn.
 if (session.phase === "playing" && session.turn === "ai") {
   scheduleAiTurn();
+} else {
+  // The shot clock is not persisted; a reload hands back a full turn.
+  startClock();
 }

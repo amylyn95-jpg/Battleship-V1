@@ -41,6 +41,13 @@ export interface Board {
 
 export type Difficulty = "easy" | "normal" | "hard";
 
+/**
+ * "classic" fires one shot per turn and marks each hit on the board.
+ * "salvo" fires one shot per surviving ship and only reports how many of them
+ * hit, so individual splashes stay ambiguous until a ship sinks.
+ */
+export type Mode = "classic" | "salvo";
+
 export type Phase = "placement" | "playing" | "gameover";
 
 export type Player = "human" | "ai";
