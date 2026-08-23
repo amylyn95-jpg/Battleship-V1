@@ -16,7 +16,7 @@ import {
   startBattle,
   toggleTarget,
 } from "./session.js";
-import { BOARD_SIZE } from "./types.js";
+import { BOARD_SIZE, FLEET } from "./types.js";
 import type { Coord, Difficulty, Mode, Orientation, Phase, ShotResult } from "./types.js";
 import {
   buildGrid,
@@ -24,15 +24,27 @@ import {
   clearPreview,
   coordLabel,
   paintBoard,
+  paintDock,
   paintFleet,
   showPreview,
   showTargets,
 } from "./ui.js";
+import {
+  isMuted,
+  playFire,
+  playHit,
+  playLose,
+  playMiss,
+  playSunk,
+  playWin,
+  setMuted,
+} from "./sound.js";
 import type { Session } from "./session.js";
 
 const AI_THINK_MS = 550;
 /** Salvo mode shot clock. */
 const TURN_SECONDS = 20;
+const SHAKE_MS = 420;
 
 function required<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -52,6 +64,14 @@ const dom = {
   randomFleet: required<HTMLButtonElement>("random-fleet"),
   resetFleet: required<HTMLButtonElement>("reset-fleet"),
   startBattle: required<HTMLButtonElement>("start-battle"),
+  startHint: required<HTMLParagraphElement>("start-hint"),
+  dock: required<HTMLUListElement>("dock"),
+  stepPlace: required<HTMLLIElement>("step-place"),
+  stepStart: required<HTMLLIElement>("step-start"),
+  stepFire: required<HTMLLIElement>("step-fire"),
+  mute: required<HTMLButtonElement>("mute"),
+  muteIcon: required<HTMLSpanElement>("mute-icon"),
+  muteLabel: required<HTMLSpanElement>("mute-label"),
   difficulty: required<HTMLSelectElement>("difficulty"),
   mode: required<HTMLSelectElement>("mode"),
   salvoBar: required<HTMLElement>("salvo-bar"),
@@ -82,6 +102,33 @@ dom.mode.value = session.mode;
 
 function setStatus(html: string): void {
   dom.status.innerHTML = html;
+}
+
+function showMuteState(): void {
+  const muted = isMuted();
+  dom.mute.setAttribute("aria-pressed", String(muted));
+  dom.muteIcon.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
+  dom.muteLabel.textContent = muted ? "Sound off" : "Sound on";
+}
+
+function shake(): void {
+  document.body.classList.add("shake");
+  window.setTimeout(() => document.body.classList.remove("shake"), SHAKE_MS);
+}
+
+/** Plays the loudest thing that happened in a volley, and shakes on a sinking. */
+function playResults(results: readonly ShotResult[]): void {
+  playFire();
+  if (results.some((r) => r.sunk)) {
+    playSunk();
+    shake();
+  } else if (results.some((r) => r.hit)) {
+    playHit();
+  } else {
+    playMiss();
+  }
+  const destroyed = results.find((r) => r.fleetDestroyed);
+  if (destroyed) window.setTimeout(() => (session.winner === "human" ? playWin() : playLose()), 450);
 }
 
 /**
@@ -137,13 +184,27 @@ function render(): void {
   const placing = session.phase === "placement";
   dom.placementPanel.classList.toggle("hidden", !placing);
   dom.aiBoard.classList.toggle("targetable", session.phase === "playing" && session.turn === "human");
-  dom.startBattle.disabled = !isFleetComplete(session.playerBoard);
+  const ready = isFleetComplete(session.playerBoard);
+  dom.startBattle.disabled = !ready;
+
+  // Step strip: highlight what the player has to do next, so "Start battle"
+  // never looks like a dead button with no explanation.
+  dom.stepPlace.classList.toggle("active", placing && !ready);
+  dom.stepPlace.classList.toggle("done", ready || !placing);
+  dom.stepStart.classList.toggle("active", placing && ready);
+  dom.stepStart.classList.toggle("done", !placing);
+  dom.stepFire.classList.toggle("active", !placing);
 
   if (placing) {
     const next = nextShipToPlace(session);
     dom.placementPrompt.textContent = next
-      ? `Place your ${next.name} (${next.length} cells, ${orientation}).`
+      ? `Place your ${next.name} (${next.length} cells, ${orientation}) — click a square on your waters.`
       : "Fleet ready. Start the battle!";
+    paintDock(dom.dock, session.playerBoard, next?.id ?? null);
+    const left = FLEET.length - session.playerBoard.ships.length;
+    dom.startHint.textContent = ready
+      ? ""
+      : `${left} ship${left === 1 ? "" : "s"} left to place — or use Random fleet.`;
   }
 
   const playerTurn = session.phase === "playing" && session.turn === "human" && !aiThinking;
@@ -232,6 +293,7 @@ function fireSalvo(timedOut = false): void {
   stopClock();
 
   const results = playerSalvo(session);
+  playResults(results);
   const prefix = timedOut ? "Time! " : "";
   setStatus(prefix + describeSalvo(results, "Your"));
   render();
@@ -255,6 +317,7 @@ function handleFireClick(coord: Coord): void {
   } catch {
     return;
   }
+  playResults([result]);
   setStatus(describe(result, "You"));
   render();
 
@@ -274,12 +337,15 @@ function scheduleAiTurn(): void {
       return;
     }
     if (session.mode === "salvo") {
-      setStatus(describeSalvo(aiSalvo(session), "Enemy"));
+      const volley = aiSalvo(session);
+      playResults(volley);
+      setStatus(describeSalvo(volley, "Enemy"));
       render();
       startClock();
       return;
     }
     const result = aiFire(session);
+    playResults([result]);
     setStatus(describe(result, "The enemy"));
     render();
   }, AI_THINK_MS);
@@ -331,6 +397,11 @@ dom.startBattle.addEventListener("click", () => {
 });
 
 dom.fireSalvo.addEventListener("click", () => fireSalvo());
+
+dom.mute.addEventListener("click", () => {
+  setMuted(!isMuted());
+  showMuteState();
+});
 
 dom.mode.addEventListener("change", () => {
   const mode = dom.mode.value as Mode;
@@ -411,6 +482,7 @@ document.addEventListener("keydown", (event) => {
   board[cellIndex(next)]!.focus();
 });
 
+showMuteState();
 setStatus(
   session.phase === "placement"
     ? "Place your fleet to begin."

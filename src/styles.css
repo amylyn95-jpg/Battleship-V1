@@ -11,6 +11,9 @@
   --invalid: #c94c4c;
   --splash: #6b8ea6;
   --target: #f2c14e;
+  --ship-dark: #5c6a73;
+  --ship-deck: #a8b6bf;
+  --foam: #eaf6ff;
   --cell: clamp(24px, 7.5vw, 38px);
 }
 
@@ -125,6 +128,118 @@ main {
   gap: 0.4rem;
 }
 
+/* ---- Setup guidance ---------------------------------------------------- */
+
+.steps {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--grid-line);
+  border-radius: 999px;
+  opacity: 0.5;
+}
+
+.step-num {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--grid-line);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.step.active {
+  opacity: 1;
+  border-color: var(--accent);
+  background: rgba(79, 195, 161, 0.12);
+}
+
+.step.active .step-num {
+  background: var(--accent);
+  color: #06202f;
+}
+
+.step.done {
+  opacity: 0.8;
+}
+
+.dock {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  font-size: 0.75rem;
+}
+
+.dock li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--grid-line);
+  border-radius: 6px;
+}
+
+/* Miniature hull, one notch wider per cell of ship length. */
+.dock-hull {
+  width: calc(var(--len) * 7px);
+  height: 8px;
+  border-radius: 60% 3px 3px 60% / 50% 3px 3px 50%;
+  background: linear-gradient(var(--ship-deck) 0 40%, var(--ship) 40% 100%);
+}
+
+.dock li.placed {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.dock li.current {
+  border-color: var(--accent);
+  background: rgba(79, 195, 161, 0.12);
+  font-weight: 700;
+}
+
+button.primary {
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06202f;
+}
+
+button.primary:disabled {
+  background: var(--sea-light);
+  border-color: var(--grid-line);
+  color: var(--text);
+}
+
+.start-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  text-align: center;
+  opacity: 0.75;
+}
+
 .status {
   margin: 0;
   min-height: 1.4em;
@@ -167,12 +282,20 @@ main {
 }
 
 .cell {
+  position: relative;
   border: none;
   padding: 0;
   border-radius: 2px;
   background: var(--sea);
   cursor: default;
   transition: background 120ms ease, transform 120ms ease;
+}
+
+/* Shot markers and hull details are drawn as overlays so a struck ship still
+   shows its hull underneath. */
+.cell::before,
+.cell::after {
+  pointer-events: none;
 }
 
 .board.targetable .cell:not(.fired) {
@@ -183,22 +306,99 @@ main {
   background: var(--sea-light);
 }
 
+/* ---- Hulls -------------------------------------------------------------
+   A ship is drawn as one continuous hull: the bow cell is pointed, the stern
+   is rounded, and mid cells carry deck plating plus a bridge block. Each cell
+   bleeds a 2px shadow into the grid gap towards the stern so the segments join
+   up instead of looking like separate squares. */
 .cell.ship {
-  background: var(--ship);
-  box-shadow: inset 0 0 0 1px rgba(7, 26, 43, 0.55);
+  --hull: var(--ship);
+  background: linear-gradient(var(--ship-deck) 0 22%, var(--hull) 22% 78%, var(--ship-dark) 78% 100%);
 }
 
-.cell.miss {
-  background: var(--miss);
+.cell.ship.hull-v {
+  background: linear-gradient(90deg, var(--ship-deck) 0 22%, var(--hull) 22% 78%, var(--ship-dark) 78% 100%);
 }
 
-.cell.hit {
-  background: var(--hit);
-  animation: pop 260ms ease;
+.cell.ship.hull-h:not(.hull-stern) {
+  box-shadow: 3px 0 0 0 var(--hull);
+}
+
+.cell.ship.hull-v:not(.hull-stern) {
+  box-shadow: 0 3px 0 0 var(--hull);
+}
+
+.cell.hull-h.hull-bow {
+  border-radius: 70% 3px 3px 70% / 50% 3px 3px 50%;
+}
+
+.cell.hull-h.hull-stern {
+  border-radius: 3px 35% 35% 3px;
+}
+
+.cell.hull-v.hull-bow {
+  border-radius: 70% 70% 3px 3px / 50% 50% 3px 3px;
+}
+
+.cell.hull-v.hull-stern {
+  border-radius: 3px 3px 35% 35%;
+}
+
+/* Bridge block on the middle of the hull. */
+.cell.ship.hull-mid::before {
+  content: "";
+  position: absolute;
+  inset: 28%;
+  border-radius: 2px;
+  background: var(--ship-dark);
+  opacity: 0.85;
 }
 
 .cell.sunk {
-  background: var(--sunk);
+  --hull: var(--sunk);
+  background: linear-gradient(rgba(139, 44, 26, 0.85) 0 22%, var(--sunk) 22% 100%);
+}
+
+.cell.sunk.hull-v {
+  background: linear-gradient(90deg, rgba(139, 44, 26, 0.85) 0 22%, var(--sunk) 22% 100%);
+}
+
+/* ---- Shot markers ------------------------------------------------------ */
+
+/* Miss: a foam ring on open water, so it never reads like a ship. */
+.cell.miss::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border: 2px solid var(--foam);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(234, 246, 255, 0.35) 0 40%, transparent 41%);
+  animation: ripple 320ms ease-out;
+}
+
+/* Hit: an explosion painted over whatever is underneath. */
+.cell.hit::after,
+.cell.sunk::after {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff6c2 0 14%,
+    #ffb545 15% 32%,
+    var(--hit) 33% 55%,
+    rgba(224, 93, 58, 0.55) 56% 74%,
+    transparent 75%
+  );
+  animation: burst 340ms ease-out;
+}
+
+/* A sunk ship keeps a smaller, smouldering mark and a dark wreck tint. */
+.cell.sunk::after {
+  inset: 20%;
+  background: radial-gradient(circle, rgba(255, 214, 145, 0.5) 0 30%, rgba(120, 30, 12, 0.6) 31% 70%, transparent 71%);
+  animation: none;
 }
 
 .cell.preview {
@@ -209,13 +409,21 @@ main {
   background: var(--invalid);
 }
 
+/* Outline rather than an inset shadow: hull segments already use box-shadow to
+   bridge the grid gap, and the more specific hull rule would replace it. */
 .cell.last-shot {
-  box-shadow: inset 0 0 0 2px var(--text);
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
 }
 
-/* Salvo mode: a fired cell whose hit-or-miss result is withheld. */
-.cell.splash {
-  background: var(--splash);
+/* Salvo mode: a fired cell whose hit-or-miss result is withheld, so the mark is
+   deliberately an unresolved plume rather than foam or fire. */
+.cell.splash::after {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--splash) 0 45%, rgba(107, 142, 166, 0.4) 46% 78%, transparent 79%);
   animation: pop 260ms ease;
 }
 
@@ -255,6 +463,56 @@ main {
   color: var(--hit);
 }
 
+@keyframes burst {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.4;
+  }
+  55% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* A sinking ship shakes the whole screen once. */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-5px, 2px);
+  }
+  40% {
+    transform: translate(4px, -3px);
+  }
+  60% {
+    transform: translate(-3px, 3px);
+  }
+  80% {
+    transform: translate(3px, -2px);
+  }
+}
+
+body.shake {
+  animation: shake 420ms ease-in-out;
+}
+
 @keyframes pop {
   0% {
     transform: scale(0.6);
@@ -271,8 +529,12 @@ main {
   .cell {
     transition: none;
   }
-  .cell.hit,
-  .cell.splash {
+  .cell.hit::after,
+  .cell.miss::after,
+  .cell.splash::after {
+    animation: none;
+  }
+  body.shake {
     animation: none;
   }
 }

@@ -23,19 +23,30 @@
           <option value="classic" selected>Classic</option>
           <option value="salvo">Salvo</option>
         </select>
+        <button id="mute" type="button" aria-pressed="false" title="Sound on or off">
+          <span id="mute-icon" aria-hidden="true">&#128266;</span> <span id="mute-label">Sound on</span>
+        </button>
         <button id="new-game" type="button">New game</button>
       </div>
     </header>
 
     <main>
+      <ol id="steps" class="steps" aria-label="How to play">
+        <li id="step-place" class="step"><span class="step-num">1</span> Place your fleet</li>
+        <li id="step-start" class="step"><span class="step-num">2</span> Start battle</li>
+        <li id="step-fire" class="step"><span class="step-num">3</span> Fire at enemy waters</li>
+      </ol>
+
       <section id="placement-panel" class="panel">
         <p id="placement-prompt" class="prompt"></p>
+        <ul id="dock" class="dock" aria-label="Ships to place"></ul>
         <div class="placement-controls">
           <button id="rotate" type="button">Rotate <kbd>R</kbd></button>
           <button id="random-fleet" type="button">Random fleet</button>
           <button id="reset-fleet" type="button">Clear</button>
-          <button id="start-battle" type="button" disabled>Start battle</button>
         </div>
+        <button id="start-battle" class="primary" type="button" disabled>Start battle</button>
+        <p id="start-hint" class="start-hint"></p>
       </section>
 
       <section id="salvo-bar" class="panel salvo-bar hidden">
