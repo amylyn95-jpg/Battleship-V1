@@ -114,6 +114,55 @@ test("salvo mode fires five shots at once and reports only a hit count", async (
   await expect(page.locator("#status")).toContainText(/Enemy salvo of 5/, { timeout: 10_000 });
 });
 
+test("draws placed ships as hulls and keeps them under damage", async ({ page }) => {
+  const own = page.locator("#player-board .cell");
+  await own.nth(0).click(); // Carrier at A1, horizontal
+  await expect(own.nth(0)).toHaveClass(/hull-bow/);
+  await expect(own.nth(2)).toHaveClass(/hull-mid/);
+  await expect(own.nth(4)).toHaveClass(/hull-stern/);
+  await expect(own.nth(0)).toHaveClass(/hull-h/);
+
+  await page.getByRole("button", { name: "Random fleet" }).click();
+  await page.getByRole("button", { name: "Start battle" }).click();
+
+  // Trade shots until the enemy lands one, then check the struck cell still
+  // shows its hull rather than being replaced by a bare orange square.
+  const struck = page.locator("#player-board .cell.hit");
+  const enemy = page.locator("#ai-board .cell");
+  for (let i = 0; i < 40 && (await struck.count()) === 0; i++) {
+    const cell = enemy.nth(i);
+    if (await cell.isEnabled()) {
+      await cell.click();
+      await page.waitForTimeout(650);
+    }
+  }
+  await expect(struck.first()).toHaveClass(/ship/);
+  await expect(struck.first()).toHaveClass(/hull-(bow|mid|stern)/);
+});
+
+test("setup screen explains what is blocking the start", async ({ page }) => {
+  await expect(page.locator("#start-battle")).toBeDisabled();
+  await expect(page.locator("#start-hint")).toContainText("5 ships left to place");
+  await expect(page.locator("#step-place")).toHaveClass(/active/);
+  await expect(page.locator("#dock li.current")).toContainText("Carrier");
+
+  await page.getByRole("button", { name: "Random fleet" }).click();
+  await expect(page.locator("#start-battle")).toBeEnabled();
+  await expect(page.locator("#start-hint")).toHaveText("");
+  await expect(page.locator("#step-start")).toHaveClass(/active/);
+});
+
+test("sound toggle flips and survives a reload", async ({ page }) => {
+  const mute = page.locator("#mute");
+  await expect(mute).toHaveAttribute("aria-pressed", "false");
+  await mute.click();
+  await expect(mute).toHaveAttribute("aria-pressed", "true");
+  await expect(mute).toContainText("Sound off");
+
+  await page.reload();
+  await expect(page.locator("#mute")).toHaveAttribute("aria-pressed", "true");
+});
+
 test("restores an in-progress game after reload", async ({ page }) => {
   await page.getByRole("button", { name: "Random fleet" }).click();
   await page.getByRole("button", { name: "Start battle" }).click();

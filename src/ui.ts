@@ -1,6 +1,9 @@
-import { BOARD_SIZE } from "./types.js";
-import type { Board, Coord, Ship } from "./types.js";
+import { BOARD_SIZE, FLEET } from "./types.js";
+import type { Board, Coord, Ship, ShipId } from "./types.js";
 import { isSunk, sameCoord } from "./board.js";
+
+/** Where a cell sits along its ship, so the hull can be drawn continuously. */
+export type HullPart = "bow" | "mid" | "stern";
 
 export interface CellRenderState {
   ship: boolean;
@@ -9,6 +12,9 @@ export interface CellRenderState {
   sunk: boolean;
   /** A fired cell whose hit-or-miss outcome is being withheld (salvo mode). */
   splash: boolean;
+  /** Null unless this cell belongs to a revealed ship. */
+  hullPart: HullPart | null;
+  hullAxis: "h" | "v" | null;
 }
 
 export function buildGrid(container: HTMLElement, onSelect: (coord: Coord) => void): HTMLButtonElement[] {
@@ -52,17 +58,24 @@ export function cellStates(
     miss: false,
     sunk: false,
     splash: false,
+    hullPart: null,
+    hullAxis: null,
   }));
 
   for (const ship of board.ships) {
     const sunk = isSunk(ship);
-    for (const cell of ship.cells) {
+    const axis = hullAxis(ship);
+    ship.cells.forEach((cell, index) => {
       const state = states[cellIndex(cell)]!;
       const wasHit = ship.hits.some((h) => sameCoord(h, cell));
       if (revealShips || wasHit || sunk) state.ship = revealShips;
+      if (revealShips) {
+        state.hullAxis = axis;
+        state.hullPart = index === 0 ? "bow" : index === ship.cells.length - 1 ? "stern" : "mid";
+      }
       if (wasHit) state.hit = true;
       if (sunk) state.sunk = true;
-    }
+    });
   }
 
   for (const shot of board.shots) {
@@ -84,6 +97,11 @@ export function cellStates(
   return states;
 }
 
+function hullAxis(ship: Ship): "h" | "v" {
+  const [first, second] = ship.cells;
+  return second && first && second.row === first.row ? "h" : "v";
+}
+
 export function paintBoard(
   cells: readonly HTMLButtonElement[],
   board: Board,
@@ -94,7 +112,13 @@ export function paintBoard(
   const states = cellStates(board, revealShips, hideOutcome);
   states.forEach((state, index) => {
     const cell = cells[index]!;
-    cell.classList.toggle("ship", state.ship && !state.hit);
+    // The hull stays drawn under a hit so damage reads as "my ship, struck here".
+    cell.classList.toggle("ship", state.ship);
+    cell.classList.toggle("hull-h", state.hullAxis === "h");
+    cell.classList.toggle("hull-v", state.hullAxis === "v");
+    cell.classList.toggle("hull-bow", state.hullPart === "bow");
+    cell.classList.toggle("hull-mid", state.hullPart === "mid");
+    cell.classList.toggle("hull-stern", state.hullPart === "stern");
     cell.classList.toggle("hit", state.hit && !state.sunk);
     cell.classList.toggle("sunk", state.sunk);
     cell.classList.toggle("miss", state.miss);
@@ -122,6 +146,32 @@ export function paintFleet(list: HTMLElement, ships: readonly Ship[]): void {
     item.textContent = `${ship.name} (${ship.length})`;
     item.classList.toggle("sunk", isSunk(ship));
     list.append(item);
+  }
+}
+
+/**
+ * The placement dock: every ship in the fleet, marked as placed or as the one
+ * being placed now, so it is obvious what is left before the battle can start.
+ */
+export function paintDock(dock: HTMLElement, board: Board, nextId: ShipId | null): void {
+  dock.textContent = "";
+  const placed = new Set(board.ships.map((ship) => ship.id));
+  for (const spec of FLEET) {
+    const item = document.createElement("li");
+    item.dataset.ship = spec.id;
+    item.classList.toggle("placed", placed.has(spec.id));
+    item.classList.toggle("current", spec.id === nextId);
+
+    const silhouette = document.createElement("span");
+    silhouette.className = "dock-hull";
+    silhouette.style.setProperty("--len", String(spec.length));
+    silhouette.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.textContent = `${spec.name} (${spec.length})`;
+
+    item.append(silhouette, label);
+    dock.append(item);
   }
 }
 
