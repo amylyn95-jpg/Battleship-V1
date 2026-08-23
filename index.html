@@ -17,6 +17,11 @@
           <option value="normal" selected>Normal</option>
           <option value="hard">Hard</option>
         </select>
+        <label for="mode">Mode</label>
+        <select id="mode" aria-label="Game mode">
+          <option value="classic" selected>Classic</option>
+          <option value="salvo">Salvo</option>
+        </select>
         <button id="new-game" type="button">New game</button>
       </div>
     </header>
@@ -30,6 +35,12 @@
           <button id="reset-fleet" type="button">Clear</button>
           <button id="start-battle" type="button" disabled>Start battle</button>
         </div>
+      </section>
+
+      <section id="salvo-bar" class="panel salvo-bar hidden">
+        <span id="salvo-count" class="salvo-count"></span>
+        <span id="salvo-timer" class="salvo-timer" aria-label="Time left this turn">--</span>
+        <button id="fire-salvo" type="button" disabled>Fire salvo <kbd>F</kbd></button>
       </section>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>

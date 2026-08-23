@@ -7,6 +7,8 @@ export interface CellRenderState {
   hit: boolean;
   miss: boolean;
   sunk: boolean;
+  /** A fired cell whose hit-or-miss outcome is being withheld (salvo mode). */
+  splash: boolean;
 }
 
 export function buildGrid(container: HTMLElement, onSelect: (coord: Coord) => void): HTMLButtonElement[] {
@@ -35,14 +37,21 @@ export function cellIndex(coord: Coord): number {
 
 /**
  * Computes what each cell should look like. `revealShips` is false for the
- * enemy board so unhit ship cells stay hidden.
+ * enemy board so unhit ship cells stay hidden. `hideOutcome` is salvo mode's
+ * rule: a shot shows as an anonymous splash until the ship it belongs to sinks,
+ * so the only feedback is the per-turn hit count.
  */
-export function cellStates(board: Board, revealShips: boolean): CellRenderState[] {
+export function cellStates(
+  board: Board,
+  revealShips: boolean,
+  hideOutcome = false,
+): CellRenderState[] {
   const states: CellRenderState[] = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, () => ({
     ship: false,
     hit: false,
     miss: false,
     sunk: false,
+    splash: false,
   }));
 
   for (const ship of board.ships) {
@@ -61,6 +70,17 @@ export function cellStates(board: Board, revealShips: boolean): CellRenderState[
     if (!state.hit) state.miss = true;
   }
 
+  if (hideOutcome && !revealShips) {
+    for (const state of states) {
+      if (state.sunk) continue;
+      if (state.hit || state.miss) {
+        state.hit = false;
+        state.miss = false;
+        state.splash = true;
+      }
+    }
+  }
+
   return states;
 }
 
@@ -69,19 +89,30 @@ export function paintBoard(
   board: Board,
   revealShips: boolean,
   lastShot: Coord | null,
+  hideOutcome = false,
 ): void {
-  const states = cellStates(board, revealShips);
+  const states = cellStates(board, revealShips, hideOutcome);
   states.forEach((state, index) => {
     const cell = cells[index]!;
     cell.classList.toggle("ship", state.ship && !state.hit);
     cell.classList.toggle("hit", state.hit && !state.sunk);
     cell.classList.toggle("sunk", state.sunk);
     cell.classList.toggle("miss", state.miss);
-    cell.classList.toggle("fired", state.hit || state.miss);
-    cell.classList.remove("preview", "preview-invalid", "last-shot");
+    cell.classList.toggle("splash", state.splash);
+    cell.classList.toggle("fired", state.hit || state.miss || state.splash);
+    cell.classList.remove("preview", "preview-invalid", "last-shot", "target");
     cell.disabled = false;
   });
   if (lastShot) cells[cellIndex(lastShot)]!.classList.add("last-shot");
+}
+
+/** Marks the cells queued up for the next salvo. */
+export function showTargets(
+  cells: readonly HTMLButtonElement[],
+  coords: readonly Coord[],
+): void {
+  for (const cell of cells) cell.classList.remove("target");
+  for (const coord of coords) cells[cellIndex(coord)]?.classList.add("target");
 }
 
 export function paintFleet(list: HTMLElement, ships: readonly Ship[]): void {

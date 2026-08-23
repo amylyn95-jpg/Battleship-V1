@@ -39,6 +39,11 @@ export function fire(board: Board, coord: Coord): { board: Board; result: ShotRe
   };
 }
 
+/** How many shots the owner of this board gets per salvo turn. */
+export function salvoSize(board: Board): number {
+  return board.ships.filter((ship) => !isSunk(ship)).length;
+}
+
 export function shotsFired(board: Board): number {
   return board.shots.length;
 }

@@ -88,6 +88,32 @@ test("resumes the AI turn when reloaded mid-think", async ({ page }) => {
   await expect(page.locator("#ai-board .cell").nth(99)).toBeEnabled();
 });
 
+test("salvo mode fires five shots at once and reports only a hit count", async ({ page }) => {
+  await page.getByLabel("Game mode").selectOption("salvo");
+  await page.getByRole("button", { name: "Random fleet" }).click();
+  await page.getByRole("button", { name: "Start battle" }).click();
+
+  const bar = page.locator("#salvo-bar");
+  await expect(bar).toBeVisible();
+  await expect(page.locator("#salvo-count")).toHaveText("Targets 0/5");
+
+  const enemy = page.locator("#ai-board .cell");
+  for (let col = 0; col < 5; col++) await enemy.nth(col).click();
+  await expect(page.locator("#salvo-count")).toHaveText("Targets 5/5");
+  // A sixth pick is refused: one shot per surviving ship.
+  await enemy.nth(5).click();
+  await expect(page.locator("#salvo-count")).toHaveText("Targets 5/5");
+
+  await page.getByRole("button", { name: /Fire salvo/ }).click();
+  await expect(page.locator("#status")).toContainText(/salvo of 5: (all misses|\d+ hits?)/);
+  // Individual outcomes stay hidden, so no cell is painted hit or miss.
+  for (let col = 0; col < 5; col++) {
+    await expect(enemy.nth(col)).toHaveClass(/fired/);
+    await expect(enemy.nth(col)).not.toHaveClass(/\bhit\b|\bmiss\b/);
+  }
+  await expect(page.locator("#status")).toContainText(/Enemy salvo of 5/, { timeout: 10_000 });
+});
+
 test("restores an in-progress game after reload", async ({ page }) => {
   await page.getByRole("button", { name: "Random fleet" }).click();
   await page.getByRole("button", { name: "Start battle" }).click();
