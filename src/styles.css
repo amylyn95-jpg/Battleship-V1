@@ -409,8 +409,11 @@ button.primary:disabled {
   background: var(--invalid);
 }
 
+/* Outline rather than an inset shadow: hull segments already use box-shadow to
+   bridge the grid gap, and the more specific hull rule would replace it. */
 .cell.last-shot {
-  box-shadow: inset 0 0 0 2px var(--text);
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
 }
 
 /* Salvo mode: a fired cell whose hit-or-miss result is withheld, so the mark is
