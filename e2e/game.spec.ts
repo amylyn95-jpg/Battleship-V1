@@ -69,6 +69,13 @@ test("plays a full game to a result screen", async ({ page }) => {
   await expect(overlay).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("#gameover-title")).toHaveText(/Victory!|Defeat/);
 
+  // The finished game lands in the record exactly once, including across a
+  // reload of the game-over screen.
+  const record = page.locator("#stats-summary dd").first();
+  await expect(record).toHaveText(/^(1W - 0L|0W - 1L)$/);
+  await page.reload();
+  await expect(page.locator("#stats-summary dd").first()).toHaveText(/^(1W - 0L|0W - 1L)$/);
+
   await page.getByRole("button", { name: "Rematch" }).click();
   await expect(overlay).toBeHidden();
   await expect(page.locator("#placement-prompt")).toContainText("Carrier");
@@ -161,6 +168,39 @@ test("sound toggle flips and survives a reload", async ({ page }) => {
 
   await page.reload();
   await expect(page.locator("#mute")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("record starts empty, opens a breakdown and can be reset", async ({ page }) => {
+  await expect(page.locator("#stats-summary dd").first()).toHaveText("0W - 0L");
+
+  // Located by id, since the label flips to "Hide breakdown" once it is open.
+  const toggle = page.locator("#stats-toggle");
+  await expect(page.locator("#stats-breakdown")).toBeHidden();
+  await toggle.click();
+  await expect(page.locator("#stats-breakdown")).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(toggle).toHaveText("Hide breakdown");
+  // One row per difficulty and one per mode.
+  await expect(page.locator("#stats-rows tr")).toHaveCount(5);
+
+  await page.getByRole("button", { name: "Reset record" }).click();
+  await expect(page.locator("#status")).toContainText("Record cleared");
+});
+
+test("fits the viewport without sideways scrolling", async ({ page }) => {
+  await page.getByRole("button", { name: "Random fleet" }).click();
+  await page.getByRole("button", { name: "Start battle" }).click();
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  // Both boards stay usable: the enemy grid is fully on screen.
+  const box = await page.locator("#ai-board").boundingBox();
+  const width = await page.evaluate(() => window.innerWidth);
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
 });
 
 test("restores an in-progress game after reload", async ({ page }) => {

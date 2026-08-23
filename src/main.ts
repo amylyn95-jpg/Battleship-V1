@@ -39,7 +39,16 @@ import {
   playWin,
   setMuted,
 } from "./sound.js";
+import {
+  applyOutcome,
+  clearStats,
+  gamesPlayed,
+  loadStats,
+  saveStats,
+  winRate,
+} from "./stats.js";
 import type { Session } from "./session.js";
+import type { Stats } from "./stats.js";
 
 const AI_THINK_MS = 550;
 /** Salvo mode shot clock. */
@@ -82,10 +91,17 @@ const dom = {
   gameover: required<HTMLDivElement>("gameover"),
   gameoverTitle: required<HTMLHeadingElement>("gameover-title"),
   gameoverStats: required<HTMLParagraphElement>("gameover-stats"),
+  gameoverRecord: required<HTMLParagraphElement>("gameover-record"),
   rematch: required<HTMLButtonElement>("rematch"),
+  statsSummary: required<HTMLElement>("stats-summary"),
+  statsToggle: required<HTMLButtonElement>("stats-toggle"),
+  statsBreakdown: required<HTMLDivElement>("stats-breakdown"),
+  statsRows: required<HTMLTableSectionElement>("stats-rows"),
+  statsReset: required<HTMLButtonElement>("stats-reset"),
 };
 
 let session: Session = load() ?? newSession("normal");
+let stats: Stats = loadStats();
 let orientation: Orientation = "horizontal";
 let cursor: Coord = { row: 0, col: 0 };
 /** True while the AI's delayed shot is pending, to lock out player input. */
@@ -102,6 +118,65 @@ dom.mode.value = session.mode;
 
 function setStatus(html: string): void {
   dom.status.innerHTML = html;
+}
+
+function statLine(label: string, value: string): HTMLElement[] {
+  const term = document.createElement("dt");
+  term.textContent = label;
+  const detail = document.createElement("dd");
+  detail.textContent = value;
+  return [term, detail];
+}
+
+/** Combined record up top; the per-difficulty and per-mode split is opt-in. */
+function renderStats(): void {
+  const played = gamesPlayed(stats);
+  dom.statsSummary.textContent = "";
+  dom.statsSummary.append(
+    ...statLine("Record", `${stats.wins}W - ${stats.losses}L`),
+    ...statLine("Win rate", played === 0 ? "--" : `${winRate(stats)}%`),
+    ...statLine("Streak", `${stats.currentStreak} (best ${stats.bestStreak})`),
+    ...statLine("Best win", stats.bestShots === null ? "--" : `${stats.bestShots} shots`),
+    ...statLine(
+      "Best accuracy",
+      stats.bestAccuracy === 0 ? "--" : `${Math.round(stats.bestAccuracy * 100)}%`,
+    ),
+  );
+
+  dom.statsRows.textContent = "";
+  const rows: [string, { wins: number; losses: number }][] = [
+    ["Easy", stats.byDifficulty.easy],
+    ["Normal", stats.byDifficulty.normal],
+    ["Hard", stats.byDifficulty.hard],
+    ["Classic", stats.byMode.classic],
+    ["Salvo", stats.byMode.salvo],
+  ];
+  for (const [label, tally] of rows) {
+    const tr = document.createElement("tr");
+    for (const text of [label, String(tally.wins), String(tally.losses)]) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.append(td);
+    }
+    dom.statsRows.append(tr);
+  }
+}
+
+/**
+ * Records the finished game once, at the moment it ends. Doing this on the
+ * transition rather than in render() keeps a reload on the game-over screen
+ * from counting the same game twice.
+ */
+function recordFinishedGame(): void {
+  stats = applyOutcome(stats, {
+    won: session.winner === "human",
+    difficulty: session.difficulty,
+    mode: session.mode,
+    shots: shotsFired(session.aiBoard),
+    accuracy: accuracy(session.aiBoard),
+  });
+  saveStats(stats);
+  renderStats();
 }
 
 function showMuteState(): void {
@@ -159,6 +234,13 @@ function describe(result: ShotResult, actor: "You" | "The enemy"): string {
 
 function currentPhase(): Phase {
   return session.phase;
+}
+
+/** True when the game just ended, after folding the result into the record. */
+function finishedNow(): boolean {
+  if (currentPhase() !== "gameover") return false;
+  recordFinishedGame();
+  return true;
 }
 
 function lastShotOf(shots: readonly ShotResult[]): Coord | null {
@@ -233,6 +315,7 @@ function render(): void {
     dom.gameoverStats.textContent = playerWon
       ? `You won in ${shots} shots (${acc}% accuracy).`
       : `The enemy sank your fleet in ${shotsFired(session.playerBoard)} shots. You fired ${shots} (${acc}% accuracy).`;
+    dom.gameoverRecord.textContent = `Record: ${stats.wins}W - ${stats.losses}L | streak ${stats.currentStreak} (best ${stats.bestStreak}).`;
     dom.rematch.focus();
   }
 
@@ -296,9 +379,11 @@ function fireSalvo(timedOut = false): void {
   playResults(results);
   const prefix = timedOut ? "Time! " : "";
   setStatus(prefix + describeSalvo(results, "Your"));
+  if (finishedNow()) {
+    render();
+    return;
+  }
   render();
-
-  if (currentPhase() === "gameover") return;
   scheduleAiTurn();
 }
 
@@ -319,9 +404,11 @@ function handleFireClick(coord: Coord): void {
   }
   playResults([result]);
   setStatus(describe(result, "You"));
+  if (finishedNow()) {
+    render();
+    return;
+  }
   render();
-
-  if (currentPhase() === "gameover") return;
   scheduleAiTurn();
 }
 
@@ -340,6 +427,7 @@ function scheduleAiTurn(): void {
       const volley = aiSalvo(session);
       playResults(volley);
       setStatus(describeSalvo(volley, "Enemy"));
+      finishedNow();
       render();
       startClock();
       return;
@@ -347,6 +435,7 @@ function scheduleAiTurn(): void {
     const result = aiFire(session);
     playResults([result]);
     setStatus(describe(result, "The enemy"));
+    finishedNow();
     render();
   }, AI_THINK_MS);
 }
@@ -397,6 +486,19 @@ dom.startBattle.addEventListener("click", () => {
 });
 
 dom.fireSalvo.addEventListener("click", () => fireSalvo());
+
+dom.statsToggle.addEventListener("click", () => {
+  const open = dom.statsBreakdown.classList.toggle("hidden");
+  dom.statsToggle.setAttribute("aria-expanded", String(!open));
+  dom.statsToggle.textContent = open ? "Show breakdown" : "Hide breakdown";
+});
+
+dom.statsReset.addEventListener("click", () => {
+  clearStats();
+  stats = loadStats();
+  renderStats();
+  setStatus("Record cleared.");
+});
 
 dom.mute.addEventListener("click", () => {
   setMuted(!isMuted());
@@ -483,6 +585,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 showMuteState();
+renderStats();
 setStatus(
   session.phase === "placement"
     ? "Place your fleet to begin."

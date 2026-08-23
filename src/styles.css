@@ -15,6 +15,7 @@
   --ship-deck: #a8b6bf;
   --foam: #eaf6ff;
   --cell: clamp(24px, 7.5vw, 38px);
+  --page: 1260px;
 }
 
 * {
@@ -30,18 +31,26 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0.75rem;
-  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+  gap: 1rem;
 }
 
+/* Slim bar that stays put, so the difficulty/mode/sound controls are reachable
+   without scrolling back up during a long game. */
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   width: 100%;
-  max-width: 900px;
+  max-width: var(--page);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--grid-line);
+  background: linear-gradient(#0b2338 70%, rgba(11, 35, 56, 0.85));
 }
 
 h1 {
@@ -52,18 +61,31 @@ h1 {
 }
 
 h2 {
-  margin: 0 0 0.4rem;
-  font-size: 0.95rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  opacity: 0.85;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.board-wrap h2 {
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--text);
 }
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.5rem 0.75rem;
   font-size: 0.85rem;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 button,
@@ -95,13 +117,40 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
-main {
+/* Two columns on a desktop: a sidebar carrying setup and records, and the
+   boards in the main area. Both stack on narrow screens. */
+.layout {
   width: 100%;
-  max-width: 900px;
+  max-width: var(--page);
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) 1fr;
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.sidebar {
   display: flex;
   flex-direction: column;
+  gap: 0.85rem;
+}
+
+.arena {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.arena-bar {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--grid-line);
+  border-radius: 8px;
+  background: rgba(13, 43, 69, 0.75);
 }
 
 .panel {
@@ -139,6 +188,11 @@ main {
   margin: 0;
   padding: 0;
   font-size: 0.8rem;
+}
+
+.sidebar .steps {
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .step {
@@ -244,7 +298,69 @@ button.primary:disabled {
   margin: 0;
   min-height: 1.4em;
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* ---- Records ----------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.6rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+}
+
+.stats dt {
+  opacity: 0.75;
+}
+
+.stats dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown {
+  margin-top: 0.6rem;
+}
+
+.breakdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.breakdown caption {
+  text-align: left;
+  padding-bottom: 0.3rem;
+  opacity: 0.7;
+  font-size: 0.72rem;
+}
+
+.breakdown th,
+.breakdown td {
+  padding: 0.15rem 0.3rem;
+  text-align: right;
+  border-bottom: 1px solid rgba(47, 102, 144, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown th:first-child,
+.breakdown td:first-child {
+  text-align: left;
+}
+
+.breakdown button {
+  margin-top: 0.5rem;
+}
+
+.gameover-record {
+  margin: 0.2rem 0 1rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
 }
 
 .status .hit-text {
@@ -600,8 +716,96 @@ footer {
   text-align: center;
 }
 
-@media (max-width: 700px) {
+/* ---- Narrow screens ----------------------------------------------------
+   One column, boards stacked, and cells sized off the viewport so a whole
+   10x10 grid always fits without sideways scrolling. */
+/* Roomier cells once there is width for them, so the boards carry the page. */
+@media (min-width: 1000px) {
+  :root {
+    --cell: 42px;
+  }
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* One column, resequenced so the page reads in the order it is used: the
+     steps, the fleet you are placing, the boards, and the record last. The
+     sidebar itself drops out of the box tree so its panels can be ordered
+     alongside the arena. */
+  .sidebar {
+    display: contents;
+  }
+
+  #howto-panel {
+    order: 1;
+  }
+
+  #placement-panel {
+    order: 2;
+  }
+
+  .arena {
+    order: 3;
+  }
+
+  #records-panel {
+    order: 4;
+  }
+
   .boards {
-    gap: 1rem;
+    gap: 1.25rem;
+  }
+
+  /* The header scrolls away here and the turn/status line takes over as the
+     thing that follows you down the page. */
+  .topbar {
+    position: static;
+  }
+
+  .arena-bar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    /* Opaque, since it now scrolls over the boards. */
+    background: #0d2b45;
+  }
+}
+
+@media (max-width: 620px) {
+  :root {
+    --cell: min(8.4vw, 34px);
+  }
+
+  body {
+    padding: 0 0.5rem 1rem;
+    gap: 0.7rem;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+  }
+
+  .controls {
+    width: 100%;
+    font-size: 0.8rem;
+  }
+
+  .boards {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .status {
+    font-size: 0.9rem;
+  }
+
+  /* Placement and salvo buttons are the main tap targets. */
+  .placement-controls button,
+  #fire-salvo,
+  #start-battle {
+    min-height: 2.5rem;
   }
 }
