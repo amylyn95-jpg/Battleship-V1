@@ -234,6 +234,8 @@ interface SerializedSession {
     queue: Coord[];
     axis: AiState["axis"];
     remainingShips: AiState["remainingShips"];
+    /** Absent in saves written before the opponent could lose the thread. */
+    lastShotHit?: boolean | null;
   };
 }
 
@@ -256,6 +258,7 @@ export function serialize(session: Session): string {
       queue: session.ai.queue,
       axis: session.ai.axis,
       remainingShips: session.ai.remainingShips,
+      lastShotHit: session.ai.lastShotHit,
     },
   };
   return JSON.stringify(payload);
@@ -281,6 +284,7 @@ export function deserialize(raw: string): Session {
       queue: data.ai.queue,
       axis: data.ai.axis,
       remainingShips: data.ai.remainingShips,
+      lastShotHit: data.ai.lastShotHit ?? null,
     },
   };
 }

@@ -1,5 +1,5 @@
 import { canPlace, inBounds, placeShip, randomFleet, shipCells, emptyBoard, isFleetComplete } from "./board.js";
-import { createAi } from "./ai.js";
+import { candidateCells, createAi } from "./ai.js";
 import { accuracy, shotsFired } from "./game.js";
 import {
   aiFire,
@@ -50,7 +50,12 @@ import {
 import type { Session } from "./session.js";
 import type { Stats } from "./stats.js";
 
-const AI_THINK_MS = 550;
+/** Pause between the enemy settling on a cell and the shot landing. */
+const AI_THINK_MS = 160;
+/** Gap between the cells the enemy visibly weighs before it fires. */
+const SCAN_STEP_MS = 130;
+/** How many cells the enemy is shown weighing; the last one is its lead. */
+const SCAN_CELLS = 3;
 /** Salvo mode shot clock. */
 const TURN_SECONDS = 20;
 const SHAKE_MS = 420;
@@ -109,6 +114,8 @@ let aiThinking = false;
 /** Salvo mode: id of the shot-clock interval, and when the clock runs out. */
 let clockTimer: number | null = null;
 let clockEndsAt = 0;
+/** Pending timers for the enemy's visible scan, so a reset can cancel them. */
+let scanTimers: number[] = [];
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
@@ -118,6 +125,11 @@ dom.mode.value = session.mode;
 
 function setStatus(html: string): void {
   dom.status.innerHTML = html;
+}
+
+/** Adds to the status without wiping what just happened to the player's shot. */
+function appendStatus(html: string): void {
+  dom.status.innerHTML += ` <span class="scan-note">${html}</span>`;
 }
 
 function statLine(label: string, value: string): HTMLElement[] {
@@ -184,6 +196,34 @@ function showMuteState(): void {
   dom.mute.setAttribute("aria-pressed", String(muted));
   dom.muteIcon.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
   dom.muteLabel.textContent = muted ? "Sound off" : "Sound on";
+}
+
+function clearScan(): void {
+  for (const timer of scanTimers) window.clearTimeout(timer);
+  scanTimers = [];
+  for (const cell of playerCells) cell.classList.remove("scanning", "scanning-lock");
+}
+
+/**
+ * Shows the cells the enemy is weighing, one at a time, ending on its strongest
+ * lead. Built from the opponent's own shot history, so it reveals nothing about
+ * where the player's ships actually are. Returns how long the build-up runs.
+ */
+function showScan(): number {
+  clearScan();
+  const wanted = session.mode === "salvo" ? SCAN_CELLS + 1 : SCAN_CELLS;
+  const candidates = candidateCells(session.ai, wanted);
+  candidates.forEach((coord, index) => {
+    const cell = playerCells[cellIndex(coord)]!;
+    const last = index === candidates.length - 1;
+    scanTimers.push(
+      window.setTimeout(() => {
+        cell.classList.add("scanning");
+        if (last) cell.classList.add("scanning-lock");
+      }, index * SCAN_STEP_MS),
+    );
+  });
+  return candidates.length * SCAN_STEP_MS;
 }
 
 function shake(): void {
@@ -415,8 +455,11 @@ function handleFireClick(coord: Coord): void {
 function scheduleAiTurn(): void {
   aiThinking = true;
   render();
+  const scanMs = showScan();
+  appendStatus("The enemy is scanning your waters&hellip;");
   window.setTimeout(() => {
     aiThinking = false;
+    clearScan();
     // Read through a helper so a stale narrowing from before the timeout does
     // not convince the compiler the phase cannot have changed.
     if (currentPhase() !== "playing" || session.turn !== "ai") {
@@ -437,7 +480,7 @@ function scheduleAiTurn(): void {
     setStatus(describe(result, "The enemy"));
     finishedNow();
     render();
-  }, AI_THINK_MS);
+  }, AI_THINK_MS + scanMs);
 }
 
 function resetGame(
@@ -446,6 +489,7 @@ function resetGame(
 ): void {
   clearSaved();
   stopClock();
+  clearScan();
   session = newSession(difficulty, mode);
   aiThinking = false;
   orientation = "horizontal";

@@ -373,6 +373,12 @@ button.primary:disabled {
   font-weight: 700;
 }
 
+/* Appended while the enemy takes aim, so the player's own result stays readable. */
+.status .scan-note {
+  opacity: 0.75;
+  font-style: italic;
+}
+
 .boards {
   display: flex;
   flex-wrap: wrap;
@@ -641,6 +647,39 @@ body.shake {
   }
 }
 
+/* The enemy weighing a cell before it fires. Drawn with an outline rather than
+   an overlay, because the hull's ::before block would otherwise cover it on
+   ship cells; the cell it settles on pulses so the shot is telegraphed. */
+.cell.scanning {
+  outline: 2px dashed rgba(240, 214, 122, 0.85);
+  outline-offset: -2px;
+  animation: scan 520ms ease-out;
+}
+
+.cell.scanning-lock {
+  outline-style: solid;
+  animation: lock 640ms ease-in-out infinite;
+}
+
+@keyframes scan {
+  0% {
+    outline-color: rgba(240, 214, 122, 0);
+  }
+  100% {
+    outline-color: rgba(240, 214, 122, 0.85);
+  }
+}
+
+@keyframes lock {
+  0%,
+  100% {
+    outline-color: rgba(240, 214, 122, 0.45);
+  }
+  50% {
+    outline-color: rgba(240, 214, 122, 1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cell {
     transition: none;
@@ -648,6 +687,10 @@ body.shake {
   .cell.hit::after,
   .cell.miss::after,
   .cell.splash::after {
+    animation: none;
+  }
+  .cell.scanning,
+  .cell.scanning-lock {
     animation: none;
   }
   body.shake {

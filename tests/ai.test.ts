@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAi, densityMap, nextShot, recordResult } from "../src/ai.js";
+import { candidateCells, createAi, densityMap, nextShot, recordResult } from "../src/ai.js";
 import { coordKey, emptyBoard, placeShip, randomFleet } from "../src/board.js";
 import { fire } from "../src/game.js";
 import { FLEET } from "../src/types.js";
@@ -175,6 +175,85 @@ describe("hunt and target", () => {
       recordResult(ai, outcome.result);
       if (outcome.result.fleetDestroyed) break;
     }
+  });
+});
+
+describe("human-like imperfection", () => {
+  /** Wounds a ship and misses one probe, leaving a live lead plus a miss. */
+  function chasingAfterAMiss(): ReturnType<typeof createAi> {
+    let board = placeShip(emptyBoard(), FLEET[2]!, { row: 4, col: 4 }, "horizontal");
+    const ai = createAi("normal");
+    for (const coord of [
+      { row: 4, col: 4 }, // hit
+      { row: 3, col: 4 }, // miss
+    ] satisfies Coord[]) {
+      const outcome = fire(board, coord);
+      board = outcome.board;
+      recordResult(ai, outcome.result);
+    }
+    return ai;
+  }
+
+  it("keeps chasing when it does not lose the thread", () => {
+    const ai = chasingAfterAMiss();
+    const head = ai.queue[0]!;
+    expect(nextShot(ai, () => 0.99)).toEqual(head);
+  });
+
+  it("breaks off after a miss but keeps the lead for later", () => {
+    const ai = chasingAfterAMiss();
+    const head = ai.queue[0]!;
+    const shot = nextShot(ai, () => 0);
+    expect(shot).not.toEqual(head);
+    expect(ai.queue).toContainEqual(head);
+  });
+
+  it("never breaks off a chase straight after a hit", () => {
+    let board = placeShip(emptyBoard(), FLEET[2]!, { row: 4, col: 4 }, "horizontal");
+    const ai = createAi("normal");
+    const outcome = fire(board, { row: 4, col: 4 });
+    board = outcome.board;
+    recordResult(ai, outcome.result);
+    expect(nextShot(ai, () => 0)).toEqual(ai.queue[0]!);
+  });
+
+  it("searches with human spacing instead of a fixed lattice", () => {
+    const ai = createAi("normal");
+    const random = seeded(21);
+    const board = emptyBoard();
+    const shots: Coord[] = [];
+
+    for (let i = 0; i < 8; i++) {
+      const coord = nextShot(ai, random);
+      // Every searching shot keeps its distance from the ones before it.
+      for (const earlier of shots) {
+        const gap = Math.max(Math.abs(earlier.row - coord.row), Math.abs(earlier.col - coord.col));
+        expect(gap).toBeGreaterThanOrEqual(2);
+      }
+      shots.push(coord);
+      recordResult(ai, fire(board, coord).result);
+    }
+    expect(shots.some((c) => (c.row + c.col) % 2 !== 0)).toBe(true);
+  });
+
+  it("telegraphs candidate cells it has not already fired at", () => {
+    const ai = createAi("normal");
+    recordResult(ai, { coord: { row: 6, col: 6 }, hit: false, fleetDestroyed: false });
+    const shown = candidateCells(ai, 4, seeded(4));
+    expect(shown).toHaveLength(4);
+    for (const coord of shown) expect(ai.tried.has(coordKey(coord))).toBe(false);
+    expect(new Set(shown.map(coordKey)).size).toBe(shown.length);
+  });
+
+  it("chooses its shot from its own history alone", () => {
+    // Two states with identical contents must produce identical shots, which is
+    // only possible if nothing outside the AI's own record can influence it.
+    const [a, b] = [createAi("hard"), createAi("hard")];
+    for (const ai of [a, b]) {
+      recordResult(ai, { coord: { row: 0, col: 0 }, hit: false, fleetDestroyed: false });
+      recordResult(ai, { coord: { row: 5, col: 5 }, hit: true, fleetDestroyed: false });
+    }
+    expect(nextShot(a, seeded(9))).toEqual(nextShot(b, seeded(9)));
   });
 });
 
