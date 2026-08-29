@@ -19,7 +19,18 @@ export interface AiState {
   /** Locked-in axis once two active hits line up. */
   axis: Axis | null;
   remainingShips: ShipId[];
+  /** Outcome of its own previous shot; null before it has fired. */
+  lastShotHit: boolean | null;
 }
+
+/**
+ * Chance of breaking off a chase after a probe misses, rather than grinding
+ * through every candidate the way a solver would. A person loses the thread.
+ */
+const DISTRACTION: Record<Difficulty, number> = { easy: 0, normal: 0.4, hard: 0.12 };
+
+/** Chance a broken-off chase turns into a diagonal probe: a classic human misread. */
+const DIAGONAL_SLIP: Record<Difficulty, number> = { easy: 0, normal: 0.3, hard: 0.08 };
 
 export function createAi(difficulty: Difficulty): AiState {
   return {
@@ -29,6 +40,7 @@ export function createAi(difficulty: Difficulty): AiState {
     queue: [],
     axis: null,
     remainingShips: FLEET.map((s) => s.id),
+    lastShotHit: null,
   };
 }
 
@@ -56,20 +68,38 @@ function neighbours(coord: Coord): Coord[] {
   ];
 }
 
-function smallestRemainingLength(state: AiState): number {
-  const lengths = FLEET.filter((s) => state.remainingShips.includes(s.id)).map((s) => s.length);
-  return lengths.length > 0 ? Math.min(...lengths) : 1;
+function diagonals(coord: Coord): Coord[] {
+  return [
+    { row: coord.row - 1, col: coord.col - 1 },
+    { row: coord.row - 1, col: coord.col + 1 },
+    { row: coord.row + 1, col: coord.col - 1 },
+    { row: coord.row + 1, col: coord.col + 1 },
+  ];
+}
+
+/** Chebyshev distance from a cell to the nearest cell already fired at. */
+function spacing(state: AiState, coord: Coord): number {
+  let best = Infinity;
+  for (const key of state.tried.keys()) {
+    const [row, col] = key.split(",").map(Number) as [number, number];
+    const distance = Math.max(Math.abs(row - coord.row), Math.abs(col - coord.col));
+    if (distance < best) best = distance;
+  }
+  return best;
 }
 
 /**
- * Hunt mode restricted to a diagonal lattice: no ship of length >= n can sit
- * entirely between cells where (row + col) % n === 0, so this halves (or better)
- * the number of wasted searching shots without ever excluding a valid target.
+ * Hunt mode the way a person searches: shots spread away from what has already
+ * been tried, so the pattern looks scattered rather than walking a
+ * mathematically perfect lattice that no ship can hide from.
  */
-function parityCells(state: AiState): Coord[] {
-  const stride = Math.max(2, smallestRemainingLength(state));
-  const candidates = allUntried(state).filter((c) => (c.row + c.col) % stride === 0);
-  return candidates.length > 0 ? candidates : allUntried(state);
+function spreadCells(state: AiState): Coord[] {
+  const cells = allUntried(state);
+  for (const gap of [3, 2]) {
+    const spaced = cells.filter((c) => spacing(state, c) >= gap);
+    if (spaced.length > 0) return spaced;
+  }
+  return cells;
 }
 
 /**
@@ -127,6 +157,26 @@ function bestByDensity(state: AiState, random: () => number): Coord | null {
   return bestCells.length > 0 ? pick(bestCells, random) : null;
 }
 
+function huntShot(state: AiState, random: () => number): Coord {
+  switch (state.difficulty) {
+    case "easy":
+      return pick(allUntried(state), random);
+    case "normal":
+      return pick(spreadCells(state), random);
+    case "hard":
+      return bestByDensity(state, random) ?? pick(allUntried(state), random);
+  }
+}
+
+/**
+ * True when the chase is dropped for this turn. Only ever after a miss, so a
+ * fresh hit is always followed up; the queue survives, so the wounded ship gets
+ * revisited later exactly as a distracted person would come back to it.
+ */
+function losesTheThread(state: AiState, random: () => number): boolean {
+  return state.lastShotHit === false && random() < DISTRACTION[state.difficulty];
+}
+
 /** Chooses the AI's next shot. Never returns a cell it has already fired at. */
 export function nextShot(state: AiState, random: () => number = Math.random): Coord {
   const remaining = allUntried(state);
@@ -140,17 +190,49 @@ export function nextShot(state: AiState, random: () => number = Math.random): Co
     // Drain stale queue entries; a cell can be queued and then fired at from a
     // different branch of the search.
     state.queue = state.queue.filter((c) => untried(state, c));
-    if (state.queue.length > 0) return state.queue[0]!;
+    if (state.queue.length > 0) {
+      if (!losesTheThread(state, random)) return state.queue[0]!;
+      const slips = state.activeHits
+        .flatMap(diagonals)
+        .filter((c) => untried(state, c));
+      if (slips.length > 0 && random() < DIAGONAL_SLIP[state.difficulty]) {
+        return pick(slips, random);
+      }
+    }
   }
 
-  switch (state.difficulty) {
-    case "easy":
-      return pick(remaining, random);
-    case "normal":
-      return pick(parityCells(state), random);
-    case "hard":
-      return bestByDensity(state, random) ?? pick(remaining, random);
+  return huntShot(state, random);
+}
+
+/**
+ * The cells the opponent is weighing this turn, its own first choice last, for
+ * the "enemy is thinking" build-up in the UI. Read purely off its own shot
+ * history, so showing them cannot leak where the player's ships are.
+ */
+export function candidateCells(
+  state: AiState,
+  limit = 4,
+  random: () => number = Math.random,
+): Coord[] {
+  const pool = state.difficulty === "easy" ? allUntried(state) : spreadCells(state);
+  const queued = state.difficulty === "easy" ? [] : state.queue.filter((c) => untried(state, c));
+  const shortlist = queued.slice(0, limit);
+  const seen = new Set(shortlist.map(coordKey));
+
+  // Draws are random, so a repeat is expected; the attempt cap keeps this
+  // bounded when the pool is smaller than the limit.
+  for (let attempt = 0; shortlist.length < limit && attempt < limit * 6; attempt++) {
+    if (pool.length === 0) break;
+    const candidate = pick(pool, random);
+    const key = coordKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    shortlist.push(candidate);
   }
+
+  // Deliberate order: vague scanning first, the strongest lead last, so the
+  // build-up leads towards the shot instead of giving it away immediately.
+  return shortlist.reverse();
 }
 
 /**
@@ -185,6 +267,7 @@ function enqueueAlongAxis(state: AiState): void {
 /** Feeds the outcome of the AI's shot back into its search state. */
 export function recordResult(state: AiState, result: ShotResult): void {
   state.tried.set(coordKey(result.coord), result.hit);
+  state.lastShotHit = result.hit;
   state.queue = state.queue.filter((c) => !sameCoord(c, result.coord));
 
   if (!result.hit) {

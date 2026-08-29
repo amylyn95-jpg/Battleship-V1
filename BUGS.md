@@ -165,6 +165,47 @@ across desktop and mobile) from a cold start.
 
 ---
 
+## 6. "The enemy hits me every time I hit it" — a perception bug, not a cheat
+
+**Symptom.** Reported by the player: every time they scored a hit, the opponent
+seemed to score one immediately afterwards, as if it were reading their shots.
+
+**Diagnosis.** The opponent cannot see the player's board — it only ever reads its
+own shot history (`AiState.tried`), and player and AI shots resolve against
+different boards. To prove that rather than assert it, I simulated 400 games per
+difficulty and measured the AI's hit rate on the shot right after a player hit
+versus right after a player miss: Normal 32.4% vs 32.7%, Easy 17.0% vs 17.4%,
+Hard 39.1% vs 36.4% (Hard's gap comes from its density map getting sharper as the
+board fills, not from the player). So the feeling was real but the cause was not
+coupling: the AI never wasted a follow-up shot, so its hits arrived in clumps
+(mean run 2.1, 29% of runs 3+), and each clump began right after the player's own
+turn. Normal also searched on a perfect diagonal lattice that no ship can hide
+from, so it found ships faster than a person would.
+
+**Fix.** Made the opponent fallibly human instead of mechanically perfect
+(`src/ai.ts`): after a miss it sometimes abandons a wounded ship and comes back to
+it later (Normal 40%, Hard 12%), occasionally probes a diagonal neighbour, and
+Normal now hunts with loose spacing rather than a fixed lattice. It still never
+repeats a shot and still sees only its own results. A visible build-up
+(`showScan()` in `src/main.ts`) highlights a few cells it is weighing before it
+fires, so a hot streak reads as reasoning rather than mind-reading — the
+candidates come from AI state only, so nothing about the player's fleet leaks.
+
+**Verification.** New unit tests assert it keeps chasing when it does not lose the
+thread, can break off after a miss but never straight after a hit, searches with
+spacing instead of a lattice, only ever telegraphs cells it has not fired at, and
+picks identical shots from identical AI state regardless of what the player did.
+Re-measured self-play: average shots to clear a fleet is 95.6 (Easy), 61.3
+(Normal), 46.7 (Hard), so difficulty ordering still holds and Normal is easier
+than before. 54 unit and 24 browser tests pass.
+
+A regression the browser tests caught: the build-up initially added ~2s per turn
+and overwrote the player's own hit/miss line, so the full-game test timed out and
+the status assertion failed. The build-up is now ~550ms total and appended to the
+player's result instead of replacing it.
+
+---
+
 ## Testing that backs these fixes
 
 | Layer                        | What it covers                                                                                   |
