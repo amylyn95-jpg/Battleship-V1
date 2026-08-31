@@ -7,28 +7,28 @@ description: How to run and end-to-end test the Battleship game in a browser —
 
 ## Running it
 
-The box's default Node (20.18.1) breaks every Vite 8 command with `Cannot find native binding`,
-because npm skips Rolldown's platform binary for Node < 20.19. Always:
-
 ```bash
-source ~/.nvm/nvm.sh && nvm use   # .nvmrc -> 22.12.0
 npm install
-npm run dev                        # http://localhost:5173
+npm run dev   # http://localhost:5173
 ```
 
+There is no `.nvmrc`; the project is on Vite 6 and runs on the box's default Node.
+
 No backend, no accounts, no credentials. `npm test` (vitest), `npm run typecheck`, `npm run lint`
-(oxlint) and `npm run build` all run offline.
+(eslint) and `npm run build` all run offline.
 
 ## Asserting board state from the DOM
 
-Don't eyeball the grids. Every cell is a `<button>` carrying:
+Don't eyeball the grids. Every cell is a `<button>` inside `#player-board` ("Your fleet") or
+`#enemy-board` (grids carry `role="grid"` and an `aria-label`), with:
 
-- `data-cell` — the human coordinate, e.g. `C5` (columns A-J left to right, rows 1-10 top to bottom)
-- `aria-label` — `"<grid name> <cell>: <visual>"` where visual is `water | ship | hit | miss | sunk`
+- `aria-label` — just the coordinate, e.g. `C5` (columns A-J left to right, rows 1-10 top to bottom)
+- `data-row` / `data-col` — zero-based indices
+- CSS classes carrying the state: `ship`, `hit`, `miss`, `sunk`, `splash` (unresolved Salvo shot),
+  plus hull-art classes `hull-h`/`hull-v` and `hull-bow`/`hull-mid`/`hull-stern`
 
-So an information-leak check is one query: before game over, no cell in *Enemy waters* may have
-`: ship` in its `aria-label` or the `cell--ship` class. Grids are labelled `Your waters` and
-`Enemy waters` via `aria-label` on the section.
+So an information-leak check is one query: before game over, no cell in the enemy grid may have
+the `ship` class.
 
 ## Driving a game fast
 
@@ -37,20 +37,24 @@ So an information-leak check is one query: before game over, no cell in *Enemy w
   17 of 100 cells are ships.
 - To reach **defeat**, pick the Hard AI and keep firing at cells you know are empty — the AI clears
   a fleet faster than a blind sweep does.
-- The AI replies after ~650 ms (`AI_THINKING_MS` in `src/App.tsx`); the phase is `aiTurn` until then
-  and all player clicks are ignored, which is intentional.
+- The AI replies after ~550 ms (`AI_THINK_MS` in `src/main.ts`); player clicks are ignored while
+  `aiThinking` is set, which is intentional.
 
 ## Behaviours that look like bugs but aren't
 
 - Turns always alternate: a hit does NOT grant an extra shot.
-- Hovering near the right/bottom edge snaps the ship inside the board (`clampStart`) instead of
-  rejecting it; red previews only ever mean an overlap.
+- A ship hovered past the right/bottom edge shows a red preview and the click is rejected
+  ("The Battleship does not fit there.") — out-of-bounds placement is refused, not snapped inside.
 - The enemy fleet roster hides partial damage until game over — deliberate, to avoid leaking which
   ships are wounded.
+- In Salvo mode, letting the 20s shot clock expire does NOT forfeit the turn: the selection is
+  topped up with random unfired cells and the salvo fires, with the status prefixed "Time!".
+- The shot that sinks a ship shows no burst animation (`.sunk` sets `animation: none`); feedback is
+  the screen shake, sound, and wreck marker.
 
 ## Regression-prone area
 
-The AI's wounded-ship tracking (`src/game/ai.ts`, `activeHits` / `alignedCandidates` / `sunkRun`)
+The AI's wounded-ship tracking (`src/ai.ts`, `activeHits` / `alignedCandidates` / `sunkRun`)
 has already produced one real bug: hits spanning two different ships were merged into one imagined
 ship, emptying the target queue and reverting the AI to random fire. It is invisible in a normal
 playthrough (the AI still wins) — you have to watch *where* it shoots after a hit. Because
