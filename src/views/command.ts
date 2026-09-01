@@ -2,8 +2,6 @@ import type { Difficulty, Mode } from "../types.js";
 
 export interface CommandViewDom {
   root: HTMLElement;
-  difficulty: HTMLSelectElement;
-  mode: HTMLSelectElement;
   mute: HTMLButtonElement;
   difficultyButtons: readonly HTMLButtonElement[];
   modeButtons: readonly HTMLButtonElement[];
@@ -16,8 +14,6 @@ export function renderCommand(
   mode: Mode,
 ): void {
   dom.root.classList.toggle("hidden", !visible);
-  dom.difficulty.value = difficulty;
-  dom.mode.value = mode;
   for (const button of dom.difficultyButtons) {
     button.classList.toggle("selected", button.dataset.difficulty === difficulty);
     button.setAttribute("aria-pressed", String(button.dataset.difficulty === difficulty));

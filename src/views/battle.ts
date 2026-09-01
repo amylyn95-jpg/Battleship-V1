@@ -1,5 +1,4 @@
-import { isSunk } from "../board.js";
-import { accuracy, longestHitStreak, shotsFired } from "../game.js";
+import { playerSalvoSize } from "../session.js";
 import type { Coord, ShotResult } from "../types.js";
 import type { Session } from "../session.js";
 import {
@@ -77,7 +76,7 @@ export function renderBattle(
   if (!visible) return;
   const salvo = session.mode === "salvo";
   paintBoard(playerCells, session.playerBoard, true, lastShotOf(session.aiShots));
-  paintBoard(aiCells, session.aiBoard, false, lastShotOf(session.playerShots), salvo);
+  paintBoard(aiCells, session.aiBoard, session.phase === "gameover", lastShotOf(session.playerShots), salvo);
   if (salvo) showTargets(aiCells, session.pendingTargets);
   else clearPreview(aiCells);
   paintOwnFleet(dom.playerFleet, session.playerBoard.ships);
@@ -95,30 +94,24 @@ export function renderBattle(
   dom.salvoBar.classList.toggle("hidden", !salvo);
   if (salvo) {
     const picked = session.pendingTargets.length;
-    dom.salvoCount.textContent = `Targets ${picked}/${session.playerBoard.ships.filter((ship) => !isSunk(ship)).length}`;
+    dom.salvoCount.textContent = `Targets ${picked}/${playerSalvoSize(session)}`;
     dom.fireSalvo.disabled = !playerTurn || picked === 0;
     if (!playerTurn) dom.salvoTimer.textContent = "--";
   }
   dom.stepFire.classList.add("active");
-  dom.battleLog.textContent = "";
-  for (const entry of session.log.slice(-30).reverse()) {
-    const item = document.createElement("li");
-    item.innerHTML = `<time>${formatLogTime(entry.at)}</time> — ${entry.text}`;
-    item.dataset.actor = entry.actor;
-    dom.battleLog.append(item);
+  const newestLogAt = session.log.at(-1)?.at ?? null;
+  const previousNewestLogAt = dom.battleLog.dataset.newestAt || null;
+  const previousLogCount = Number(dom.battleLog.dataset.logCount ?? -1);
+  if (previousLogCount !== session.log.length || previousNewestLogAt !== (newestLogAt === null ? null : String(newestLogAt))) {
+    dom.battleLog.textContent = "";
+    for (const entry of session.log.slice(-30).reverse()) {
+      const item = document.createElement("li");
+      item.innerHTML = `<time>${formatLogTime(entry.at)}</time> — ${entry.text}`;
+      item.dataset.actor = entry.actor;
+      dom.battleLog.append(item);
+    }
+    dom.battleLog.dataset.logCount = String(session.log.length);
+    if (newestLogAt === null) delete dom.battleLog.dataset.newestAt;
+    else dom.battleLog.dataset.newestAt = String(newestLogAt);
   }
-}
-
-export function shotSummary(session: Session): {
-  shots: number;
-  hits: number;
-  accuracy: number;
-  streak: number;
-} {
-  return {
-    shots: shotsFired(session.aiBoard),
-    hits: session.playerShots.filter((shot) => shot.hit).length,
-    accuracy: accuracy(session.aiBoard),
-    streak: longestHitStreak(session.playerShots),
-  };
 }

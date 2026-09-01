@@ -12,7 +12,7 @@
     <header class="topbar">
       <h1>Battleship</h1>
       <div class="controls">
-        <button id="new-game" type="button">Command</button>
+        <button id="new-game" type="button">New game</button>
       </div>
     </header>
 
@@ -20,22 +20,11 @@
       <section id="command-screen" class="screen command-screen">
         <p class="eyebrow">Tactical Fleet Command</p>
         <h2>BATTLESHIP</h2>
-        <label for="difficulty">Difficulty</label>
-        <select id="difficulty" aria-label="AI difficulty">
-          <option value="easy">Recruit</option>
-          <option value="normal" selected>Tactical</option>
-          <option value="hard">Admiral</option>
-        </select>
         <div class="choice-row" aria-label="Difficulty presets">
           <button type="button" data-difficulty="easy">RECRUIT</button>
           <button type="button" data-difficulty="normal">TACTICAL</button>
           <button type="button" data-difficulty="hard">ADMIRAL</button>
         </div>
-        <label for="mode">Mode</label>
-        <select id="mode" aria-label="Game mode">
-          <option value="classic" selected>Classic</option>
-          <option value="salvo">Salvo</option>
-        </select>
         <div class="choice-row" aria-label="Mode presets">
           <button type="button" data-mode="classic">CLASSIC</button>
           <button type="button" data-mode="salvo">SALVO</button>

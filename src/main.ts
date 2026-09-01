@@ -3,7 +3,7 @@ import { createAi } from "./ai.js";
 import { appendLog, aiFire, aiSalvo, clearSaved, fillTargets, load, newSession, nextShipToPlace, playerFire, playerSalvo, save, startBattle, toggleTarget } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
 import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
-import { buildGrid, cellIndex, clearPreview, showPreview } from "./ui.js";
+import { buildGrid, cellIndex, clearPreview, coordLabel, showPreview } from "./ui.js";
 import { isMuted, playFire, playHit, playLose, playMiss, playSunk, playWin, setMuted } from "./sound.js";
 import { renderCommand } from "./views/command.js";
 import { renderDeploy, setupDeployDrag } from "./views/deploy.js";
@@ -24,8 +24,6 @@ function required<T extends HTMLElement>(id: string): T {
 
 const dom = {
   command: required<HTMLElement>("command-screen"),
-  commandDifficulty: required<HTMLSelectElement>("difficulty"),
-  commandMode: required<HTMLSelectElement>("mode"),
   difficultyButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")],
   modeButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-mode]")],
   deploy: required<HTMLElement>("deploy-screen"),
@@ -82,6 +80,8 @@ let clockTimer: number | null = null;
 let clockEndsAt = 0;
 let aiTimer: number | null = null;
 let incomingTimer: number | null = null;
+let renderedScreen: Screen | null = null;
+let aimingCell: HTMLButtonElement | null = null;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
@@ -119,6 +119,7 @@ function playResults(results: readonly ShotResult[]): void {
 
 function appendResultsLog(results: readonly ShotResult[], actor: "you" | "enemy"): void {
   appendLog(session, actor, logText(results, actor, session.mode === "salvo"));
+  if (session.mode !== "salvo") return;
   for (const result of results) {
     if (result.sunk) {
       appendLog(session, actor, actor === "you" ? `You sank the ${result.sunk.name}.` : `The enemy sank your ${result.sunk.name}.`);
@@ -141,8 +142,6 @@ function render(): void {
   renderCommand(
     {
       root: dom.command,
-      difficulty: dom.commandDifficulty,
-      mode: dom.commandMode,
       mute: dom.mute,
       difficultyButtons: dom.difficultyButtons,
       modeButtons: dom.modeButtons,
@@ -207,6 +206,7 @@ function render(): void {
   dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy");
   dom.steps.classList.toggle("hidden", screen === "command");
   dom.status.classList.toggle("hidden", screen === "command");
+  const enteringDebrief = screen === "debrief" && renderedScreen !== "debrief";
   renderDebrief(
     {
       root: dom.gameover,
@@ -219,7 +219,9 @@ function render(): void {
     },
     session,
     screen === "debrief",
+    enteringDebrief,
   );
+  renderedScreen = screen;
   if (screen !== "command") save(session);
 }
 
@@ -260,6 +262,21 @@ function previewPlacement(coord: Coord, id: ShipId | null = selectedShipId): voi
   showPreview(playerCells, cells, canPlace(session.playerBoard, spec, coord, orientation));
 }
 
+function updateAiming(next: Coord | null): void {
+  const playerTurn = session.phase === "playing" && session.turn === "human" && !aiThinking;
+  const target = playerTurn && next ? aiCells[cellIndex(next)] : null;
+  if (aimingCell && aimingCell !== target) aimingCell.classList.remove("aiming");
+  if (target && !target.classList.contains("fired")) {
+    target.classList.add("aiming");
+    aimingCell = target;
+    aiming = next;
+  } else {
+    aimingCell = null;
+    aiming = null;
+  }
+  dom.targetReadout.textContent = aiming === null ? "TARGET LOCK — —" : `TARGET LOCK — ${coordLabel(aiming)}`;
+}
+
 function stopClock(): void {
   if (clockTimer !== null) window.clearInterval(clockTimer);
   clockTimer = null;
@@ -290,6 +307,7 @@ function fireSalvo(timedOut = false): void {
   appendResultsLog(results, "you");
   playResults(results);
   setStatus(`${timedOut ? "Time! " : ""}${describeSalvo(results, "Your")}`);
+  aiming = null;
   syncScreenToPhase();
   render();
   if (currentPhase() !== "gameover") scheduleAiTurn();
@@ -311,6 +329,7 @@ function handleFireClick(coord: Coord): void {
   appendResultsLog([result], "you");
   playResults([result]);
   setStatus(describe(result, "You"));
+  aiming = null;
   syncScreenToPhase();
   render();
   if (currentPhase() !== "gameover") scheduleAiTurn();
@@ -363,6 +382,7 @@ function resetGame(difficulty: Difficulty = session.difficulty, mode: Mode = ses
   orientation = "horizontal";
   selectedShipId = nextShipToPlace(session)?.id ?? null;
   aiming = null;
+  aimingCell = null;
   setStatus("Place your fleet to begin.");
   render();
 }
@@ -374,15 +394,6 @@ setupDeployDrag(dom.dock, playerCells, {
   clear: () => clearPreview(playerCells),
 });
 
-dom.commandDifficulty.addEventListener("change", () => {
-  session.difficulty = dom.commandDifficulty.value as Difficulty;
-  session.ai = createAi(session.difficulty);
-  render();
-});
-dom.commandMode.addEventListener("change", () => {
-  session.mode = dom.commandMode.value as Mode;
-  render();
-});
 for (const button of dom.difficultyButtons) {
   button.addEventListener("click", () => {
     session.difficulty = button.dataset.difficulty as Difficulty;
@@ -434,9 +445,9 @@ dom.mute.addEventListener("click", () => {
   setMuted(!isMuted());
   showMuteState();
 });
-dom.newGame.addEventListener("click", () => resetGame(dom.commandDifficulty.value as Difficulty, dom.commandMode.value as Mode, "command"));
+dom.newGame.addEventListener("click", () => resetGame(session.difficulty, session.mode, "command"));
 dom.rematch.addEventListener("click", () => resetGame(session.difficulty, session.mode));
-dom.newBattle.addEventListener("click", () => resetGame("normal", "classic", "command"));
+dom.newBattle.addEventListener("click", () => resetGame(session.difficulty, session.mode, "command"));
 dom.changeDifficulty.addEventListener("click", () => {
   resetGame(session.difficulty, session.mode, "command");
   window.setTimeout(() => dom.difficultyButtons[0]?.focus(), 0);
@@ -445,7 +456,7 @@ dom.changeDifficulty.addEventListener("click", () => {
 for (const [cells, onEnter] of [
   [playerCells, (coord: Coord) => previewPlacement(coord)],
   [aiCells, (coord: Coord) => {
-    aiming = coord;
+    updateAiming(coord);
     clearPreview(playerCells);
   }],
 ] as const) {
@@ -454,23 +465,19 @@ for (const [cells, onEnter] of [
     cell.addEventListener("mouseenter", () => {
       cursor = coord;
       onEnter(coord);
-      render();
     });
     cell.addEventListener("focus", () => {
       cursor = coord;
       onEnter(coord);
-      render();
     });
     cell.addEventListener("mouseleave", () => {
       if (cells === aiCells) {
-        aiming = null;
-        render();
+        updateAiming(null);
       }
     });
     cell.addEventListener("blur", () => {
       if (cells === aiCells) {
-        aiming = null;
-        render();
+        updateAiming(null);
       }
     });
   });

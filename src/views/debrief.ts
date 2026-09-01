@@ -1,6 +1,6 @@
 import { accuracy, hitCount, longestHitStreak, rating, shotsFired } from "../game.js";
 import { isSunk } from "../board.js";
-import type { Difficulty, Mode } from "../types.js";
+import type { Difficulty } from "../types.js";
 import type { Session } from "../session.js";
 
 export interface DebriefViewDom {
@@ -24,7 +24,7 @@ function difficultyLabel(difficulty: Difficulty): string {
   return { easy: "Recruit", normal: "Tactical", hard: "Admiral" }[difficulty];
 }
 
-export function renderDebrief(dom: DebriefViewDom, session: Session, visible: boolean): void {
+export function renderDebrief(dom: DebriefViewDom, session: Session, visible: boolean, focusActions: boolean): void {
   dom.root.classList.toggle("hidden", !visible);
   if (!visible) return;
   const won = session.winner === "human";
@@ -49,9 +49,5 @@ export function renderDebrief(dom: DebriefViewDom, session: Session, visible: bo
   ]
     .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
     .join("");
-  dom.rematch.focus();
-}
-
-export function selectedBattleSettings(session: Session): { difficulty: Difficulty; mode: Mode } {
-  return { difficulty: session.difficulty, mode: session.mode };
+  if (focusActions) dom.rematch.focus();
 }

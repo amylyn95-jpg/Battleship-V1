@@ -83,6 +83,7 @@ test("plays a full game to debrief and rematch", async ({ page }) => {
   }
   await expect(page.locator("#gameover")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("#gameover-title")).toHaveText(/ENEMY FLEET DESTROYED|MISSION FAILED — FLEET LOST/);
+  await expect(page.locator("#ai-board .cell.ship").first()).toBeVisible();
   await expect(page.locator("#gameover-stats")).toContainText("Shots fired");
   await expect(page.locator("#gameover-stats")).toContainText("Elapsed time");
   await expect(page.getByRole("button", { name: "REMATCH" })).toBeFocused();
@@ -100,7 +101,7 @@ test("resumes the AI turn when reloaded mid-think", async ({ page }) => {
 });
 
 test("salvo mode fires five shots at once and reports only a hit count", async ({ page }) => {
-  await page.getByLabel("Game mode").selectOption("salvo");
+  await page.getByRole("button", { name: "SALVO" }).click();
   await engage(page);
   await expect(page.locator("#salvo-bar")).toBeVisible();
   await expect(page.locator("#salvo-count")).toHaveText("Targets 0/5");
