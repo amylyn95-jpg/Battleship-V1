@@ -1,5 +1,5 @@
 import { alreadyFiredAt, isFleetDestroyed, isSunk, sameCoord, shipAt } from "./board.js";
-import type { Board, Coord, Ship, ShotResult } from "./types.js";
+import type { Board, Coord, Difficulty, Ship, ShotResult } from "./types.js";
 
 export class InvalidShotError extends Error {}
 
@@ -59,4 +59,35 @@ export function accuracy(board: Board): number {
 
 export function wasHit(board: Board, coord: Coord): boolean {
   return board.ships.some((s) => s.hits.some((h) => sameCoord(h, coord)));
+}
+
+/** Longest run of consecutive hits in the order the shots were fired. */
+export function longestHitStreak(shots: readonly ShotResult[]): number {
+  let current = 0;
+  let longest = 0;
+  for (const shot of shots) {
+    current = shot.hit ? current + 1 : 0;
+    longest = Math.max(longest, current);
+  }
+  return longest;
+}
+
+export type Rating = "Cadet" | "Lieutenant" | "Commander" | "Admiral";
+
+/** accuracy is 0..1. */
+export function rating(input: { won: boolean; accuracy: number; difficulty: Difficulty }): Rating {
+  const ratings: Rating[] = ["Cadet", "Lieutenant", "Commander", "Admiral"];
+  let index: number;
+  if (!input.won) {
+    index = input.accuracy >= 0.35 ? 1 : 0;
+  } else if (input.accuracy < 0.25) {
+    index = 1;
+  } else if (input.accuracy < 0.35) {
+    index = 2;
+  } else {
+    index = 3;
+  }
+  if (input.difficulty === "hard") index++;
+  if (input.difficulty === "easy") index--;
+  return ratings[Math.min(ratings.length - 1, Math.max(0, index))]!;
 }

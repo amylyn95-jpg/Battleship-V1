@@ -20,7 +20,7 @@ No backend, no accounts, no credentials. `npm test` (vitest), `npm run typecheck
 ## Asserting board state from the DOM
 
 Don't eyeball the grids. Every cell is a `<button>` inside `#player-board` ("Your fleet") or
-`#enemy-board` (grids carry `role="grid"` and an `aria-label`), with:
+`#ai-board` (grids carry `role="grid"` and an `aria-label`), with:
 
 - `aria-label` — just the coordinate, e.g. `C5` (columns A-J left to right, rows 1-10 top to bottom)
 - `data-row` / `data-col` — zero-based indices
@@ -32,7 +32,8 @@ the `ship` class.
 
 ## Driving a game fast
 
-- Skip manual placement with **Random fleet**, then **Start battle**.
+- Fresh loads open on the command screen. Click **DEPLOY FLEET**, then skip manual
+  placement with **Random fleet**, then **ENGAGE ENEMY**.
 - To reach **victory** quickly, sweep the enemy grid systematically (all of row 1, then row 2, ...);
   17 of 100 cells are ships.
 - To reach **defeat**, pick the Hard AI and keep firing at cells you know are empty — the AI clears

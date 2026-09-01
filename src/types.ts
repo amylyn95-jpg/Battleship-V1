@@ -52,6 +52,12 @@ export type Phase = "placement" | "playing" | "gameover";
 
 export type Player = "human" | "ai";
 
+export interface LogEntry {
+  readonly at: number;
+  readonly actor: "you" | "enemy" | "system";
+  readonly text: string;
+}
+
 export interface ShotResult {
   readonly coord: Coord;
   readonly hit: boolean;

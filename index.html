@@ -12,60 +12,79 @@
     <header class="topbar">
       <h1>Battleship</h1>
       <div class="controls">
+        <button id="new-game" type="button">Command</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="command-screen" class="screen command-screen">
+        <p class="eyebrow">Tactical Fleet Command</p>
+        <h2>BATTLESHIP</h2>
         <label for="difficulty">Difficulty</label>
         <select id="difficulty" aria-label="AI difficulty">
-          <option value="easy">Easy</option>
-          <option value="normal" selected>Normal</option>
-          <option value="hard">Hard</option>
+          <option value="easy">Recruit</option>
+          <option value="normal" selected>Tactical</option>
+          <option value="hard">Admiral</option>
         </select>
+        <div class="choice-row" aria-label="Difficulty presets">
+          <button type="button" data-difficulty="easy">RECRUIT</button>
+          <button type="button" data-difficulty="normal">TACTICAL</button>
+          <button type="button" data-difficulty="hard">ADMIRAL</button>
+        </div>
         <label for="mode">Mode</label>
         <select id="mode" aria-label="Game mode">
           <option value="classic" selected>Classic</option>
           <option value="salvo">Salvo</option>
         </select>
+        <div class="choice-row" aria-label="Mode presets">
+          <button type="button" data-mode="classic">CLASSIC</button>
+          <button type="button" data-mode="salvo">SALVO</button>
+        </div>
         <button id="mute" type="button" aria-pressed="false" title="Sound on or off">
           <span id="mute-icon" aria-hidden="true">&#128266;</span> <span id="mute-label">Sound on</span>
         </button>
-        <button id="new-game" type="button">New game</button>
-      </div>
-    </header>
-
-    <main>
-      <ol id="steps" class="steps" aria-label="How to play">
-        <li id="step-place" class="step"><span class="step-num">1</span> Place your fleet</li>
-        <li id="step-start" class="step"><span class="step-num">2</span> Start battle</li>
-        <li id="step-fire" class="step"><span class="step-num">3</span> Fire at enemy waters</li>
-      </ol>
-
-      <section id="placement-panel" class="panel">
-        <p id="placement-prompt" class="prompt"></p>
-        <ul id="dock" class="dock" aria-label="Ships to place"></ul>
-        <div class="placement-controls">
-          <button id="rotate" type="button">Rotate <kbd>R</kbd></button>
-          <button id="random-fleet" type="button">Random fleet</button>
-          <button id="reset-fleet" type="button">Clear</button>
-        </div>
-        <button id="start-battle" class="primary" type="button" disabled>Start battle</button>
-        <p id="start-hint" class="start-hint"></p>
+        <button class="primary" type="button" data-action="deploy">DEPLOY FLEET</button>
       </section>
 
-      <section id="salvo-bar" class="panel salvo-bar hidden">
-        <span id="salvo-count" class="salvo-count"></span>
-        <span id="salvo-timer" class="salvo-timer" aria-label="Time left this turn">--</span>
-        <button id="fire-salvo" type="button" disabled>Fire salvo <kbd>F</kbd></button>
+      <section id="deploy-screen" class="screen hidden">
+        <ol id="steps" class="steps" aria-label="How to play">
+          <li id="step-place" class="step"><span class="step-num">1</span> Place your fleet</li>
+          <li id="step-start" class="step"><span class="step-num">2</span> Engage enemy</li>
+          <li id="step-fire" class="step"><span class="step-num">3</span> Fire at enemy waters</li>
+        </ol>
+        <section class="panel">
+          <p id="placement-prompt" class="prompt"></p>
+          <ul id="dock" class="dock" aria-label="Ships to place"></ul>
+          <div class="placement-controls">
+            <button id="rotate" type="button">Rotate <kbd>R</kbd></button>
+            <button id="random-fleet" type="button">Random fleet</button>
+            <button id="reset-fleet" type="button">Clear</button>
+          </div>
+          <button id="engage-enemy" class="primary" type="button" disabled>ENGAGE ENEMY</button>
+          <p id="start-hint" class="start-hint"></p>
+        </section>
       </section>
 
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <section id="battle-screen" class="screen hidden">
+        <div id="turn-banner" class="turn-banner" role="status" aria-live="polite"></div>
+        <div id="target-readout" class="target-readout">TARGET LOCK — —</div>
+        <section id="salvo-bar" class="panel salvo-bar hidden">
+          <span id="salvo-count" class="salvo-count"></span>
+          <span id="salvo-timer" class="salvo-timer" aria-label="Time left this turn">--</span>
+          <button id="fire-salvo" type="button" disabled>Fire salvo <kbd>F</kbd></button>
+        </section>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <ul id="battle-log" class="battle-log" aria-label="Battle log"></ul>
+      </section>
 
-      <div class="boards">
-        <section class="board-wrap">
-          <h2>Your waters</h2>
+      <div id="board-area" class="boards hidden">
+        <section id="player-wrap" class="board-wrap">
+          <h2>YOUR FLEET</h2>
           <div id="player-board" class="board" role="grid" aria-label="Your fleet"></div>
           <ul id="player-fleet" class="fleet"></ul>
         </section>
-
-        <section class="board-wrap">
-          <h2>Enemy waters</h2>
+        <section id="ai-wrap" class="board-wrap">
+          <h2>ENEMY WATERS</h2>
           <div id="ai-board" class="board" role="grid" aria-label="Enemy waters"></div>
           <ul id="ai-fleet" class="fleet"></ul>
         </section>
@@ -75,8 +94,13 @@
     <div id="gameover" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
       <div class="overlay-card">
         <h2 id="gameover-title"></h2>
-        <p id="gameover-stats"></p>
-        <button id="rematch" type="button">Rematch</button>
+        <dl id="gameover-stats" class="stats-grid"></dl>
+        <p>Rating: <strong id="gameover-rating"></strong></p>
+        <div class="overlay-actions">
+          <button id="rematch" type="button">REMATCH</button>
+          <button id="new-battle" type="button">NEW BATTLE</button>
+          <button id="change-difficulty" type="button">CHANGE DIFFICULTY</button>
+        </div>
       </div>
     </div>
 

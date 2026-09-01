@@ -10,7 +10,17 @@ import { createAi, nextShot, recordResult } from "./ai.js";
 import { fire, salvoSize } from "./game.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
 import type { AiState } from "./ai.js";
-import type { Board, Coord, Difficulty, Mode, Phase, Player, ShipSpec, ShotResult } from "./types.js";
+import type {
+  Board,
+  Coord,
+  Difficulty,
+  LogEntry,
+  Mode,
+  Phase,
+  Player,
+  ShipSpec,
+  ShotResult,
+} from "./types.js";
 
 export interface Session {
   phase: Phase;
@@ -27,6 +37,10 @@ export interface Session {
   playerShots: ShotResult[];
   aiShots: ShotResult[];
   winner: Player | null;
+  turns: number;
+  startedAt: number | null;
+  endedAt: number | null;
+  log: LogEntry[];
 }
 
 export function newSession(difficulty: Difficulty, mode: Mode = "classic"): Session {
@@ -42,6 +56,10 @@ export function newSession(difficulty: Difficulty, mode: Mode = "classic"): Sess
     playerShots: [],
     aiShots: [],
     winner: null,
+    turns: 0,
+    startedAt: null,
+    endedAt: null,
+    log: [],
   };
 }
 
@@ -56,6 +74,14 @@ export function startBattle(session: Session): void {
   session.phase = "playing";
   session.turn = "human";
   session.pendingTargets = [];
+  session.startedAt = Date.now();
+  session.endedAt = null;
+  session.turns = 0;
+  session.log = [];
+}
+
+export function appendLog(session: Session, actor: LogEntry["actor"], text: string): void {
+  session.log.push({ at: Date.now(), actor, text });
 }
 
 /** How many shots the human gets this turn; always 1 outside salvo mode. */
@@ -120,10 +146,12 @@ export function playerSalvo(session: Session): ShotResult[] {
     if (result.fleetDestroyed) break;
   }
   session.pendingTargets = [];
+  session.turns++;
 
   if (results.some((r) => r.fleetDestroyed)) {
     session.phase = "gameover";
     session.winner = "human";
+    session.endedAt = Date.now();
   } else {
     session.turn = "ai";
   }
@@ -169,6 +197,7 @@ export function aiSalvo(session: Session, random: () => number = Math.random): S
   if (results.some((r) => r.fleetDestroyed)) {
     session.phase = "gameover";
     session.winner = "ai";
+    session.endedAt = Date.now();
   } else {
     session.turn = "human";
   }
@@ -183,10 +212,12 @@ export function playerFire(session: Session, coord: Coord): ShotResult {
   const { board, result } = fire(session.aiBoard, coord);
   session.aiBoard = board;
   session.playerShots.push(result);
+  session.turns++;
 
   if (result.fleetDestroyed) {
     session.phase = "gameover";
     session.winner = "human";
+    session.endedAt = Date.now();
   } else {
     session.turn = "ai";
   }
@@ -207,6 +238,7 @@ export function aiFire(session: Session, random: () => number = Math.random): Sh
   if (result.fleetDestroyed) {
     session.phase = "gameover";
     session.winner = "ai";
+    session.endedAt = Date.now();
   } else {
     session.turn = "human";
   }
@@ -215,7 +247,7 @@ export function aiFire(session: Session, random: () => number = Math.random): Sh
 
 const STORAGE_KEY = "battleship.session.v1";
 
-interface SerializedSession {
+export interface SerializedSession {
   phase: Phase;
   difficulty: Difficulty;
   /** Absent in saves written before salvo mode existed. */
@@ -227,6 +259,10 @@ interface SerializedSession {
   playerShots: ShotResult[];
   aiShots: ShotResult[];
   winner: Player | null;
+  turns?: number;
+  startedAt?: number | null;
+  endedAt?: number | null;
+  log?: LogEntry[];
   ai: {
     difficulty: Difficulty;
     tried: [string, boolean][];
@@ -249,6 +285,10 @@ export function serialize(session: Session): string {
     playerShots: session.playerShots,
     aiShots: session.aiShots,
     winner: session.winner,
+    turns: session.turns,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+    log: session.log,
     ai: {
       difficulty: session.ai.difficulty,
       tried: [...session.ai.tried.entries()],
@@ -274,6 +314,10 @@ export function deserialize(raw: string): Session {
     playerShots: data.playerShots,
     aiShots: data.aiShots,
     winner: data.winner,
+    turns: data.turns ?? 0,
+    startedAt: data.startedAt ?? null,
+    endedAt: data.endedAt ?? null,
+    log: data.log ?? [],
     ai: {
       difficulty: data.ai.difficulty,
       tried: new Map(data.ai.tried),
