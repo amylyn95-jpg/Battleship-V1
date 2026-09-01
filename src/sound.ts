@@ -109,11 +109,34 @@ export function playMiss(): void {
 }
 
 /** Explosion for a shot that lands on a hull. */
-export function playHit(): void {
+export function playHit(level = 0): void {
   const ac = audio();
   if (!ac) return;
-  noise(ac, { duration: 0.5, gain: 0.25, frequency: 1400 });
-  tone(ac, { type: "sawtooth", from: 240, to: 40, duration: 0.4, gain: 0.18 });
+  noise(ac, { duration: 0.5, gain: 0.25 + level * 0.02, frequency: 1400 });
+  tone(ac, { type: "sawtooth", from: 240, to: 40, duration: 0.4, gain: 0.18 + level * 0.015 });
+}
+
+/** Short whoosh as a torpedo leaves the tube. */
+export function playLaunch(): void {
+  const ac = audio();
+  if (!ac) return;
+  noise(ac, { duration: 0.28, gain: 0.09, filter: "bandpass", frequency: 500 });
+  tone(ac, { type: "sine", from: 240, to: 70, duration: 0.24, gain: 0.08 });
+}
+
+/** Two pings for a sonar contact. */
+export function playSonar(): void {
+  const ac = audio();
+  if (!ac) return;
+  tone(ac, { type: "sine", from: 880, to: 880, duration: 0.1, gain: 0.08 });
+  tone(ac, { type: "sine", from: 880, to: 880, duration: 0.1, gain: 0.08, delay: 0.16 });
+}
+
+/** Brief radio squelch before a Commander Voss transmission. */
+export function playRadio(): void {
+  const ac = audio();
+  if (!ac) return;
+  noise(ac, { duration: 0.12, gain: 0.06, filter: "bandpass", frequency: 1600 });
 }
 
 /** Deeper, longer groan when a whole ship goes down. */

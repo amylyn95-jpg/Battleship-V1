@@ -46,6 +46,23 @@ test("random fleet, engage, fire and see feedback", async ({ page }) => {
   await expect(page.locator("#battle-log li")).not.toHaveCount(0);
 });
 
+test("shows radar and Commander Voss comms during battle", async ({ page }) => {
+  await expect(page.locator("#ai-wrap .fx-layer .radar")).toHaveCount(0);
+  await engage(page);
+  await expect(page.locator("#ai-wrap .fx-layer .radar")).toHaveCount(1);
+  const line = await page.locator("#comms-line").textContent();
+  expect(line).toBeTruthy();
+  await page.locator("#ai-board .cell").nth(0).click();
+  await expect(page.locator("#comms-line")).not.toHaveText(line ?? "");
+});
+
+test("cleans up transient cinematic effects", async ({ page }) => {
+  await engage(page);
+  await page.locator("#ai-board .cell").nth(0).click();
+  await page.waitForTimeout(2_000);
+  await expect(page.locator("#ai-wrap .torpedo, #ai-wrap .impact, #ai-wrap .sonar-pulse")).toHaveCount(0);
+});
+
 test("cannot fire twice at the same cell", async ({ page }) => {
   await engage(page);
   const cell = page.locator("#ai-board .cell").nth(12);
@@ -177,4 +194,21 @@ test("enemy fleet status does not show partial damage during battle", async ({ p
   await engage(page);
   await page.locator("#ai-board .cell").nth(0).click();
   await expect(page.locator("#ai-fleet")).not.toContainText(/\d+ of \d+ damage/);
+});
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("plays through turns with cinematic animations suppressed", async ({ page }) => {
+    await engage(page);
+    await expect(page.locator("#ai-wrap .fx-layer .radar")).toHaveCount(1);
+    await page.locator("#ai-board .cell").nth(0).click();
+    await expect(page.locator("#ai-board .cell").nth(0)).toHaveClass(/fired/);
+    await expect(page.locator("#turn-banner")).toContainText("YOUR TURN", { timeout: 10_000 });
+    await expect(page.locator("#ai-wrap .torpedo, #ai-wrap .impact, #ai-wrap .sonar-pulse")).toHaveCount(0);
+    const next = page.locator("#ai-board .cell").nth(1);
+    await expect(next).toBeEnabled({ timeout: 10_000 });
+    await next.click();
+    await expect(next).toHaveClass(/fired/, { timeout: 10_000 });
+  });
 });

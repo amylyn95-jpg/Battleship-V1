@@ -1,10 +1,23 @@
-import { canPlace, emptyBoard, inBounds, isFleetComplete, placeShip, randomFleet, shipCells } from "./board.js";
+import { canPlace, emptyBoard, inBounds, isFleetComplete, isSunk, placeShip, randomFleet, shipCells } from "./board.js";
+import { vossLine } from "./commander.js";
+import type { VossEvent } from "./commander.js";
 import { createAi } from "./ai.js";
+import {
+  ensureLayer,
+  impact,
+  intensityLevel,
+  launchTorpedo,
+  setIntensity,
+  setRadar,
+  shake as effectShake,
+  sonarPulse,
+} from "./effects.js";
+import { longestHitStreak } from "./game.js";
 import { appendLog, aiFire, aiSalvo, clearSaved, fillTargets, load, newSession, nextShipToPlace, playerFire, playerSalvo, save, startBattle, toggleTarget } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
 import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
 import { buildGrid, cellIndex, clearPreview, coordLabel, showPreview } from "./ui.js";
-import { isMuted, playFire, playHit, playLose, playMiss, playSunk, playWin, setMuted } from "./sound.js";
+import { isMuted, playFire, playHit, playLaunch, playLose, playMiss, playRadio, playSonar, playSunk, playWin, setMuted } from "./sound.js";
 import { renderCommand } from "./views/command.js";
 import { renderDeploy, setupDeployDrag } from "./views/deploy.js";
 import { describe, describeSalvo, logText, renderBattle } from "./views/battle.js";
@@ -13,7 +26,6 @@ import type { Session } from "./session.js";
 
 const AI_THINK_MS = 550;
 const TURN_SECONDS = 20;
-const SHAKE_MS = 420;
 type Screen = "command" | "deploy" | "battle" | "debrief";
 
 function required<T extends HTMLElement>(id: string): T {
@@ -65,6 +77,7 @@ const dom = {
   turnBanner: required<HTMLElement>("turn-banner"),
   targetReadout: required<HTMLElement>("target-readout"),
   battleLog: required<HTMLUListElement>("battle-log"),
+  commsLine: required<HTMLElement>("comms-line"),
 };
 
 const saved = load();
@@ -85,6 +98,8 @@ let aimingCell: HTMLButtonElement | null = null;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
+ensureLayer(dom.playerWrap);
+ensureLayer(dom.aiWrap);
 
 function setStatus(html: string): void {
   dom.status.innerHTML = html;
@@ -97,18 +112,64 @@ function showMuteState(): void {
   dom.muteLabel.textContent = muted ? "Sound off" : "Sound on";
 }
 
-function shake(): void {
-  document.body.classList.add("shake");
-  window.setTimeout(() => document.body.classList.remove("shake"), SHAKE_MS);
+function shake(strength: "light" | "heavy" = "light"): void {
+  effectShake(strength);
+}
+
+function announceVoss(event: VossEvent): void {
+  playRadio();
+  dom.commsLine.textContent = vossLine(event);
+}
+
+function resultKind(result: ShotResult): "hit" | "miss" | "sunk" {
+  if (result.sunk) return "sunk";
+  return result.hit ? "hit" : "miss";
+}
+
+function playerShotEffects(results: readonly ShotResult[]): void {
+  const salvo = session.mode === "salvo";
+  for (const result of results) {
+    playLaunch();
+    launchTorpedo(dom.aiWrap, "bottom", result.coord);
+    if (!salvo) {
+      playSonar();
+      sonarPulse(dom.aiWrap, result.coord);
+    }
+    impact(dom.aiWrap, result.coord, salvo ? "miss" : resultKind(result));
+  }
+  const sunk = results.find((result) => result.sunk)?.sunk?.name ?? null;
+  announceVoss({
+    kind: "player-shot",
+    hit: results.some((result) => result.hit),
+    sunk,
+    streak: longestHitStreak(session.playerShots),
+  });
+}
+
+function enemyShotEffects(results: readonly ShotResult[]): void {
+  const salvo = session.mode === "salvo";
+  for (const result of results) {
+    playLaunch();
+    launchTorpedo(dom.playerWrap, "top", result.coord);
+    impact(dom.playerWrap, result.coord, salvo ? "miss" : resultKind(result));
+  }
+  const sunk = results.find((result) => result.sunk)?.sunk?.name ?? null;
+  announceVoss({
+    kind: "enemy-shot",
+    hit: results.some((result) => result.hit),
+    sunk,
+  });
 }
 
 function playResults(results: readonly ShotResult[]): void {
   playFire();
   if (results.some((result) => result.sunk)) {
     playSunk();
-    shake();
+    shake("heavy");
   } else if (results.some((result) => result.hit)) {
-    playHit();
+    const playerSunk = session.playerBoard.ships.filter(isSunk).length;
+    const enemySunk = session.aiBoard.ships.filter(isSunk).length;
+    playHit(intensityLevel(playerSunk, enemySunk));
   } else {
     playMiss();
   }
@@ -133,8 +194,11 @@ function currentPhase(): Phase {
 
 function syncScreenToPhase(): void {
   if (session.phase === "gameover") {
+    const enteringDebrief = screen !== "debrief";
     screen = "debrief";
     aiming = null;
+    setRadar(dom.aiWrap, false);
+    if (enteringDebrief) announceVoss({ kind: session.winner === "human" ? "victory" : "defeat" });
   }
 }
 
@@ -201,6 +265,10 @@ function render(): void {
     screen === "battle" || screen === "debrief",
     incomingFire,
   );
+  const playerSunk = session.playerBoard.ships.filter(isSunk).length;
+  const enemySunk = session.aiBoard.ships.filter(isSunk).length;
+  setIntensity(intensityLevel(playerSunk, enemySunk));
+  setRadar(dom.aiWrap, screen === "battle" && session.phase === "playing" && session.turn === "human" && !aiThinking);
   dom.boardArea.classList.toggle("hidden", screen === "command");
   dom.playerWrap.classList.toggle("hidden", screen === "command");
   dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy");
@@ -306,6 +374,7 @@ function fireSalvo(timedOut = false): void {
   const results = playerSalvo(session);
   appendResultsLog(results, "you");
   playResults(results);
+  playerShotEffects(results);
   setStatus(`${timedOut ? "Time! " : ""}${describeSalvo(results, "Your")}`);
   aiming = null;
   syncScreenToPhase();
@@ -328,6 +397,7 @@ function handleFireClick(coord: Coord): void {
   }
   appendResultsLog([result], "you");
   playResults([result]);
+  playerShotEffects([result]);
   setStatus(describe(result, "You"));
   aiming = null;
   syncScreenToPhase();
@@ -354,6 +424,7 @@ function scheduleAiTurn(): void {
       const volley = aiSalvo(session);
       appendResultsLog(volley, "enemy");
       playResults(volley);
+      enemyShotEffects(volley);
       setStatus(describeSalvo(volley, "Enemy"));
       syncScreenToPhase();
       render();
@@ -363,6 +434,7 @@ function scheduleAiTurn(): void {
     const result = aiFire(session);
     appendResultsLog([result], "enemy");
     playResults([result]);
+    enemyShotEffects([result]);
     setStatus(describe(result, "The enemy"));
     syncScreenToPhase();
     render();
@@ -435,6 +507,7 @@ dom.engage.addEventListener("click", () => {
   if (session.phase !== "placement" || !isFleetComplete(session.playerBoard)) return;
   startBattle(session);
   appendLog(session, "system", "Battle started.");
+  announceVoss({ kind: "battle-start", difficulty: session.difficulty });
   screen = "battle";
   setStatus(session.mode === "salvo" ? "Battle stations — pick one target per surviving ship, then fire." : "Battle stations — fire at the enemy waters.");
   render();

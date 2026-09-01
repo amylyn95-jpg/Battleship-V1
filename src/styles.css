@@ -803,3 +803,251 @@ footer {
     animation: none;
   }
 }
+
+/* ---- Cinematic command effects ---------------------------------------- */
+
+.board-wrap {
+  position: relative;
+}
+
+.fx-layer {
+  position: absolute;
+  top: 2rem;
+  left: 50%;
+  z-index: 2;
+  width: calc(var(--cell) * 10 + 4px);
+  height: calc(var(--cell) * 10 + 4px);
+  overflow: visible;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.radar-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 0.45;
+  opacity: 0.3;
+}
+
+.radar-sweep {
+  fill: var(--accent);
+  opacity: 0.14;
+  transform-origin: 50% 50%;
+  animation: radar-sweep 2.8s linear infinite;
+}
+
+.sonar-pulse {
+  fill: none;
+  stroke: var(--target);
+  stroke-width: 0.8;
+  animation: sonar-pulse 850ms ease-out;
+}
+
+.torpedo {
+  fill: none;
+  stroke: var(--foam);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-dasharray: 8 92;
+  animation: torpedo-travel 650ms linear;
+}
+
+.impact {
+  stroke-width: 0.7;
+  animation: impact-flash 420ms ease-out;
+}
+
+.impact-hit {
+  fill: var(--hit);
+  stroke: #fff6c2;
+}
+
+.impact-miss {
+  fill: var(--foam);
+  stroke: var(--miss);
+}
+
+.impact-sunk {
+  fill: var(--target);
+  stroke: var(--hit);
+  animation-duration: 760ms;
+}
+
+.cell.ship.sunk::before {
+  content: "";
+  position: absolute;
+  width: 55%;
+  height: 55%;
+  inset: 5% auto auto 30%;
+  border-radius: 50%;
+  background: rgba(159, 184, 200, 0.35);
+  filter: blur(2px);
+  animation: smoke-drift 1.8s ease-out infinite;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+body[data-intensity="1"]::before {
+  opacity: 0.18;
+  box-shadow: inset 0 0 46px rgba(224, 93, 58, 0.18);
+}
+
+body[data-intensity="2"]::before {
+  opacity: 0.28;
+  box-shadow: inset 0 0 70px rgba(224, 93, 58, 0.24);
+}
+
+body[data-intensity="3"]::before {
+  opacity: 0.36;
+  box-shadow: inset 0 0 92px rgba(224, 93, 58, 0.3);
+}
+
+.comms.hidden {
+  display: none;
+}
+
+.comms {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  animation: comms-slide 240ms ease-out;
+}
+
+.comms-officer {
+  flex: 0 0 2.8rem;
+  width: 2.8rem;
+  height: 2.8rem;
+  fill: var(--ship);
+  stroke: var(--ship-deck);
+  stroke-width: 1;
+}
+
+.comms-name {
+  color: var(--accent);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+}
+
+.comms p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+}
+
+@keyframes radar-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sonar-pulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.3);
+    transform-origin: center;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(7);
+    transform-origin: center;
+  }
+}
+
+@keyframes torpedo-travel {
+  from {
+    stroke-dashoffset: 100;
+    opacity: 0.2;
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes impact-flash {
+  from {
+    opacity: 0.9;
+    transform: scale(0.35);
+    transform-origin: center;
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.5);
+    transform-origin: center;
+  }
+}
+
+@keyframes smoke-drift {
+  0% {
+    opacity: 0.15;
+    transform: translate(0, 0) scale(0.6);
+  }
+  70% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(25%, -80%) scale(1.3);
+  }
+}
+
+@keyframes comms-slide {
+  from {
+    opacity: 0;
+    transform: translateY(0.3rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake-heavy {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  15% {
+    transform: translate(-8px, 3px);
+  }
+  30% {
+    transform: translate(7px, -5px);
+  }
+  45% {
+    transform: translate(-6px, 4px);
+  }
+  60% {
+    transform: translate(5px, -4px);
+  }
+  75% {
+    transform: translate(-3px, 2px);
+  }
+}
+
+body.shake-heavy {
+  animation: shake-heavy 560ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-layer .radar-sweep,
+  .fx-layer .sonar-pulse,
+  .fx-layer .torpedo,
+  .fx-layer .impact,
+  .cell.ship.sunk::before,
+  .comms,
+  body::before,
+  body.shake-heavy {
+    animation: none;
+    transition: none;
+  }
+}
