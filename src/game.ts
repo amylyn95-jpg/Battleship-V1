@@ -72,6 +72,13 @@ export function longestHitStreak(shots: readonly ShotResult[]): number {
   return longest;
 }
 
+/** Consecutive hits at the end of the order the shots were fired. */
+export function currentHitStreak(shots: readonly ShotResult[]): number {
+  let current = 0;
+  for (let index = shots.length - 1; index >= 0 && shots[index]!.hit; index--) current++;
+  return current;
+}
+
 export type Rating = "Cadet" | "Lieutenant" | "Commander" | "Admiral";
 
 /** accuracy is 0..1. */

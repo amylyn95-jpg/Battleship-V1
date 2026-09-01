@@ -20,14 +20,22 @@
       <section id="command-screen" class="screen command-screen">
         <p class="eyebrow">Tactical Fleet Command</p>
         <h2>BATTLESHIP</h2>
-        <div class="choice-row" aria-label="Difficulty presets">
-          <button type="button" data-difficulty="easy">RECRUIT</button>
-          <button type="button" data-difficulty="normal">TACTICAL</button>
-          <button type="button" data-difficulty="hard">ADMIRAL</button>
+        <div class="command-choice">
+          <p class="choice-label">DIFFICULTY</p>
+          <div class="choice-row" aria-label="Difficulty presets">
+            <button type="button" data-difficulty="easy">RECRUIT</button>
+            <button type="button" data-difficulty="normal">TACTICAL</button>
+            <button type="button" data-difficulty="hard">ADMIRAL</button>
+          </div>
+          <p id="difficulty-description" class="choice-description"></p>
         </div>
-        <div class="choice-row" aria-label="Mode presets">
-          <button type="button" data-mode="classic">CLASSIC</button>
-          <button type="button" data-mode="salvo">SALVO</button>
+        <div class="command-choice">
+          <p class="choice-label">ENGAGEMENT MODE</p>
+          <div class="choice-row" aria-label="Mode presets">
+            <button type="button" data-mode="classic">CLASSIC</button>
+            <button type="button" data-mode="salvo">SALVO</button>
+          </div>
+          <p id="mode-description" class="choice-description"></p>
         </div>
         <button id="mute" type="button" aria-pressed="false" title="Sound on or off">
           <span id="mute-icon" aria-hidden="true">&#128266;</span> <span id="mute-label">Sound on</span>
@@ -105,7 +113,7 @@
     </div>
 
     <footer>
-      <p>Click a cell to fire. Keyboard: arrow keys to move, Enter or Space to fire.</p>
+      <p id="footer-hint">Click a cell to fire. Keyboard: arrow keys to move, Enter or Space to fire.</p>
     </footer>
 
     <script type="module" src="/src/main.ts"></script>

@@ -43,7 +43,8 @@ export function ensureLayer(wrap: HTMLElement): SVGSVGElement {
   layer.setAttribute("viewBox", "0 0 100 100");
   layer.setAttribute("preserveAspectRatio", "none");
   layer.setAttribute("aria-hidden", "true");
-  wrap.append(layer);
+  const host = wrap.querySelector<HTMLElement>(".board-frame") ?? wrap;
+  host.append(layer);
   return layer;
 }
 

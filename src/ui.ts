@@ -37,6 +37,30 @@ export function buildGrid(container: HTMLElement, onSelect: (coord: Coord) => vo
   return cells;
 }
 
+export function paintCoordinates(wrap: HTMLElement): void {
+  if (wrap.querySelector(".board-frame")) return;
+  const board = wrap.querySelector<HTMLElement>(".board");
+  if (!board) return;
+  const frame = document.createElement("div");
+  frame.className = "board-frame";
+  const top = document.createElement("div");
+  top.className = "coordinate-labels coordinate-labels-top";
+  top.setAttribute("aria-hidden", "true");
+  const side = document.createElement("div");
+  side.className = "coordinate-labels coordinate-labels-side";
+  side.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < BOARD_SIZE; index++) {
+    const column = document.createElement("span");
+    column.textContent = String.fromCharCode(65 + index);
+    top.append(column);
+    const row = document.createElement("span");
+    row.textContent = String(index + 1);
+    side.append(row);
+  }
+  wrap.insertBefore(frame, board);
+  frame.append(top, side, board);
+}
+
 export function cellIndex(coord: Coord): number {
   return coord.row * BOARD_SIZE + coord.col;
 }

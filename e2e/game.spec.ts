@@ -21,17 +21,24 @@ test.afterEach(() => {
 async function enterDeployment(page: Page): Promise<void> {
   await page.getByRole("button", { name: "DEPLOY FLEET" }).click();
   await expect(page.locator("#deploy-screen")).toBeVisible();
+  await expect(page.locator("#ai-wrap")).toBeHidden();
+  await expect(page.locator("#footer-hint")).toBeHidden();
 }
 
 async function engage(page: Page): Promise<void> {
   await enterDeployment(page);
   await page.getByRole("button", { name: "Random fleet" }).click();
   await page.getByRole("button", { name: "ENGAGE ENEMY" }).click();
+  await expect(page.locator("#ai-wrap")).toBeVisible();
+  await expect(page.locator("#footer-hint")).toBeVisible();
 }
 
 test("passes through the command screen", async ({ page }) => {
   await expect(page.locator("#command-screen")).toBeVisible();
+  await expect(page.locator("#footer-hint")).toBeHidden();
   await page.getByRole("button", { name: "ADMIRAL" }).click();
+  await expect(page.locator("#difficulty-description")).toContainText("Probability targeting");
+  await expect(page.locator("#mode-description")).toContainText("Classic engagement");
   await page.getByRole("button", { name: "DEPLOY FLEET" }).click();
   await expect(page.locator("#placement-prompt")).toContainText("Carrier");
 });
@@ -39,6 +46,11 @@ test("passes through the command screen", async ({ page }) => {
 test("random fleet, engage, fire and see feedback", async ({ page }) => {
   await engage(page);
   await expect(page.getByText("Battle stations")).toBeVisible();
+  await expect(page.locator("#ai-wrap .coordinate-labels-top span")).toHaveCount(10);
+  await expect(page.locator("#ai-wrap .coordinate-labels-top span").first()).toHaveText("A");
+  await expect(page.locator("#ai-wrap .coordinate-labels-top span").last()).toHaveText("J");
+  await expect(page.locator("#ai-wrap .coordinate-labels-side span").first()).toHaveText("1");
+  await expect(page.locator("#ai-wrap .coordinate-labels-side span").last()).toHaveText("10");
   const enemy = page.locator("#ai-board .cell");
   await enemy.nth(0).click();
   await expect(page.locator("#status")).toContainText(/You (hit|missed)/);

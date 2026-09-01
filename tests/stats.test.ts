@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { longestHitStreak, rating } from "../src/game.js";
+import { currentHitStreak, longestHitStreak, rating } from "../src/game.js";
 import type { ShotResult } from "../src/types.js";
 
 function shot(hit: boolean): ShotResult {
@@ -11,6 +11,13 @@ describe("battle statistics", () => {
     expect(longestHitStreak([])).toBe(0);
     expect(longestHitStreak([shot(true), shot(true), shot(false), shot(true)])).toBe(2);
     expect(longestHitStreak([shot(false), shot(true), shot(true), shot(true)])).toBe(3);
+  });
+
+  it("finds the consecutive hits at the end of the shot history", () => {
+    expect(currentHitStreak([])).toBe(0);
+    expect(currentHitStreak([shot(true), shot(true)])).toBe(2);
+    expect(currentHitStreak([shot(true), shot(true), shot(false)])).toBe(0);
+    expect(currentHitStreak([shot(false), shot(true), shot(true)])).toBe(2);
   });
 
   it("rates losses by accuracy", () => {

@@ -2,21 +2,12 @@ import { canPlace, emptyBoard, inBounds, isFleetComplete, isSunk, placeShip, ran
 import { vossLine } from "./commander.js";
 import type { VossEvent } from "./commander.js";
 import { createAi } from "./ai.js";
-import {
-  ensureLayer,
-  impact,
-  intensityLevel,
-  launchTorpedo,
-  setIntensity,
-  setRadar,
-  shake as effectShake,
-  sonarPulse,
-} from "./effects.js";
-import { longestHitStreak } from "./game.js";
+import { ensureLayer, impact, intensityLevel, launchTorpedo, setIntensity, setRadar, shake, sonarPulse } from "./effects.js";
+import { currentHitStreak } from "./game.js";
 import { appendLog, aiFire, aiSalvo, clearSaved, fillTargets, load, newSession, nextShipToPlace, playerFire, playerSalvo, save, startBattle, toggleTarget } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
 import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
-import { buildGrid, cellIndex, clearPreview, coordLabel, showPreview } from "./ui.js";
+import { buildGrid, cellIndex, clearPreview, coordLabel, paintCoordinates, showPreview } from "./ui.js";
 import { isMuted, playFire, playHit, playLaunch, playLose, playMiss, playRadio, playSonar, playSunk, playWin, setMuted } from "./sound.js";
 import { renderCommand } from "./views/command.js";
 import { renderDeploy, setupDeployDrag } from "./views/deploy.js";
@@ -38,6 +29,8 @@ const dom = {
   command: required<HTMLElement>("command-screen"),
   difficultyButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")],
   modeButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-mode]")],
+  difficultyDescription: required<HTMLElement>("difficulty-description"),
+  modeDescription: required<HTMLElement>("mode-description"),
   deploy: required<HTMLElement>("deploy-screen"),
   battle: required<HTMLElement>("battle-screen"),
   boardArea: required<HTMLElement>("board-area"),
@@ -78,6 +71,7 @@ const dom = {
   targetReadout: required<HTMLElement>("target-readout"),
   battleLog: required<HTMLUListElement>("battle-log"),
   commsLine: required<HTMLElement>("comms-line"),
+  footerHint: required<HTMLElement>("footer-hint"),
 };
 
 const saved = load();
@@ -98,6 +92,8 @@ let aimingCell: HTMLButtonElement | null = null;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
+paintCoordinates(dom.playerWrap);
+paintCoordinates(dom.aiWrap);
 ensureLayer(dom.playerWrap);
 ensureLayer(dom.aiWrap);
 
@@ -110,10 +106,6 @@ function showMuteState(): void {
   dom.mute.setAttribute("aria-pressed", String(muted));
   dom.muteIcon.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
   dom.muteLabel.textContent = muted ? "Sound off" : "Sound on";
-}
-
-function shake(strength: "light" | "heavy" = "light"): void {
-  effectShake(strength);
 }
 
 function announceVoss(event: VossEvent): void {
@@ -142,16 +134,15 @@ function playerShotEffects(results: readonly ShotResult[]): void {
     kind: "player-shot",
     hit: results.some((result) => result.hit),
     sunk,
-    streak: longestHitStreak(session.playerShots),
+    streak: currentHitStreak(session.playerShots),
   });
 }
 
 function enemyShotEffects(results: readonly ShotResult[]): void {
-  const salvo = session.mode === "salvo";
   for (const result of results) {
     playLaunch();
     launchTorpedo(dom.playerWrap, "top", result.coord);
-    impact(dom.playerWrap, result.coord, salvo ? "miss" : resultKind(result));
+    impact(dom.playerWrap, result.coord, resultKind(result));
   }
   const sunk = results.find((result) => result.sunk)?.sunk?.name ?? null;
   announceVoss({
@@ -209,6 +200,8 @@ function render(): void {
       mute: dom.mute,
       difficultyButtons: dom.difficultyButtons,
       modeButtons: dom.modeButtons,
+      difficultyDescription: dom.difficultyDescription,
+      modeDescription: dom.modeDescription,
     },
     screen === "command",
     session.difficulty,
@@ -274,6 +267,7 @@ function render(): void {
   dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy");
   dom.steps.classList.toggle("hidden", screen === "command");
   dom.status.classList.toggle("hidden", screen === "command");
+  dom.footerHint.classList.toggle("hidden", screen !== "battle");
   const enteringDebrief = screen === "debrief" && renderedScreen !== "debrief";
   renderDebrief(
     {

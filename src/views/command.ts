@@ -5,7 +5,20 @@ export interface CommandViewDom {
   mute: HTMLButtonElement;
   difficultyButtons: readonly HTMLButtonElement[];
   modeButtons: readonly HTMLButtonElement[];
+  difficultyDescription: HTMLElement;
+  modeDescription: HTMLElement;
 }
+
+const difficultyDescriptions: Record<Difficulty, string> = {
+  easy: "Random fire — unpredictable contacts, lighter pressure.",
+  normal: "Hunts systematically — closes the net by pattern.",
+  hard: "Probability targeting — every shot is calculated.",
+};
+
+const modeDescriptions: Record<Mode, string> = {
+  classic: "Classic engagement — one target per turn.",
+  salvo: "Salvo engagement — one target per surviving ship.",
+};
 
 export function renderCommand(
   dom: CommandViewDom,
@@ -22,4 +35,6 @@ export function renderCommand(
     button.classList.toggle("selected", button.dataset.mode === mode);
     button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
   }
+  dom.difficultyDescription.textContent = difficultyDescriptions[difficulty];
+  dom.modeDescription.textContent = modeDescriptions[mode];
 }

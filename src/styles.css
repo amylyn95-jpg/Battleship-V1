@@ -738,6 +738,7 @@ footer {
   border: 1px solid var(--grid-line);
   border-radius: 8px;
   background: rgba(13, 43, 69, 0.4);
+  color: var(--text);
   font-size: 0.78rem;
 }
 
@@ -752,7 +753,7 @@ footer {
 }
 
 .battle-log time {
-  opacity: 0.7;
+  opacity: 0.9;
   font-variant-numeric: tabular-nums;
 }
 
@@ -798,6 +799,54 @@ footer {
   gap: 0.4rem;
 }
 
+.board-wrap.hidden {
+  display: none;
+}
+
+.board-frame {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.2rem auto;
+  grid-template-rows: 1.2rem auto;
+  max-width: 100%;
+}
+
+.board-frame .board {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.coordinate-labels {
+  color: var(--miss);
+  font-size: 0.68rem;
+  line-height: 1;
+  opacity: 0.9;
+  user-select: none;
+}
+
+.coordinate-labels span {
+  display: grid;
+  place-items: center;
+}
+
+.coordinate-labels-top {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: repeat(10, var(--cell));
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.coordinate-labels-side {
+  display: grid;
+  grid-column: 1;
+  grid-row: 2;
+  grid-template-rows: repeat(10, var(--cell));
+  gap: 2px;
+  padding: 2px 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .battle-log li {
     animation: none;
@@ -820,6 +869,12 @@ footer {
   overflow: visible;
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+.board-frame .fx-layer {
+  top: 1.2rem;
+  left: 1.2rem;
+  transform: none;
 }
 
 .radar-ring {
@@ -1049,5 +1104,80 @@ body.shake-heavy {
   body.shake-heavy {
     animation: none;
     transition: none;
+  }
+}
+
+/* ---- Command screen --------------------------------------------------- */
+
+.command-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.command-screen::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(80vw, 38rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(79, 195, 161, 0.22);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 18%, rgba(79, 195, 161, 0.12) 18.2% 18.5%, transparent 18.7% 25%),
+    conic-gradient(from -35deg, transparent 0 10%, rgba(79, 195, 161, 0.16) 13%, transparent 23% 100%);
+  transform: translate(-50%, -50%);
+  animation: command-radar 18s linear infinite;
+  pointer-events: none;
+}
+
+.command-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+.command-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: min(100%, 34rem);
+}
+
+.choice-label {
+  margin: 0.4rem 0 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.choice-description {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--miss);
+  font-size: 0.78rem;
+}
+
+.command-screen .choice-row button {
+  min-width: 7.5rem;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.command-screen .choice-row button.selected {
+  box-shadow: 0 0 0 2px rgba(79, 195, 161, 0.18), 0 0 1rem rgba(79, 195, 161, 0.16);
+}
+
+@keyframes command-radar {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-screen::before {
+    animation: none;
   }
 }
