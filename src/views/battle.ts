@@ -77,11 +77,12 @@ export function renderBattle(
   const salvo = session.mode === "salvo";
   paintBoard(playerCells, session.playerBoard, true, lastShotOf(session.aiShots));
   paintBoard(aiCells, session.aiBoard, session.phase === "gameover", lastShotOf(session.playerShots), salvo);
+  for (const cell of playerCells) cell.disabled = true;
   if (salvo) showTargets(aiCells, session.pendingTargets);
   else clearPreview(aiCells);
   paintOwnFleet(dom.playerFleet, session.playerBoard.ships);
   paintEnemyFleet(dom.aiFleet, session.aiBoard.ships);
-  const playerTurn = session.turn === "human" && !aiThinking;
+  const playerTurn = session.phase === "playing" && session.turn === "human" && !aiThinking;
   dom.turnBanner.textContent = incomingFire ? "INCOMING FIRE" : playerTurn ? "YOUR TURN — SELECT TARGET" : "ENEMY ANALYZING";
   dom.turnBanner.classList.toggle("incoming", incomingFire);
   dom.aiBoard.classList.toggle("targetable", playerTurn);

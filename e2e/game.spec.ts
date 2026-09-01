@@ -49,6 +49,7 @@ test("passes through the command screen", async ({ page }) => {
 
 test("random fleet, engage, fire and see feedback", async ({ page }) => {
   await engage(page);
+  await expect(page.locator("#player-board .cell:not([disabled])")).toHaveCount(0);
   await expect(page.getByText("Battle stations")).toBeVisible();
   await expect(page.locator("#ai-wrap .coordinate-labels-top span")).toHaveCount(10);
   await expect(page.locator("#ai-wrap .coordinate-labels-top span").first()).toHaveText("A");
@@ -93,7 +94,8 @@ test("manual placement rejects an overlapping ship", async ({ page }) => {
   await own.nth(0).click();
   await expect(page.locator("#placement-prompt")).toContainText("Battleship");
   await own.nth(1).click();
-  await expect(page.locator("#status")).toContainText("does not fit");
+  await expect(page.locator("#deploy-status")).toBeVisible();
+  await expect(page.locator("#deploy-status")).toContainText("does not fit");
 });
 
 test("drag-and-drop placement selects the dragged ship", async ({ page }) => {
@@ -117,6 +119,7 @@ test("plays a full game to debrief and rematch", async ({ page }) => {
   await expect(page.locator("#gameover")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("#gameover-title")).toHaveText(/ENEMY FLEET DESTROYED|MISSION FAILED — FLEET LOST/);
   await expect(page.locator("#ai-board .cell.ship").first()).toBeVisible();
+  await expect(page.locator("#ai-board .cell:not([disabled])")).toHaveCount(0);
   await expect(page.locator("#gameover-stats")).toContainText("Shots fired");
   await expect(page.locator("#gameover-stats")).toContainText("Elapsed time");
   await expect(page.getByRole("button", { name: "REMATCH" })).toBeFocused();

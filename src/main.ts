@@ -42,6 +42,7 @@ const dom = {
   playerFleet: required<HTMLUListElement>("player-fleet"),
   aiFleet: required<HTMLUListElement>("ai-fleet"),
   status: required<HTMLParagraphElement>("status"),
+  deployStatus: required<HTMLParagraphElement>("deploy-status"),
   placementPrompt: required<HTMLParagraphElement>("placement-prompt"),
   rotate: required<HTMLButtonElement>("rotate"),
   randomFleet: required<HTMLButtonElement>("random-fleet"),
@@ -99,7 +100,8 @@ ensureLayer(dom.playerWrap);
 ensureLayer(dom.aiWrap);
 
 function setStatus(html: string): void {
-  dom.status.innerHTML = html;
+  const target = screen === "deploy" ? dom.deployStatus : dom.status;
+  target.innerHTML = html;
 }
 
 function showMuteState(): void {
@@ -310,7 +312,7 @@ function placeSelected(coord: Coord, id: ShipId | null = selectedShipId): void {
   }
   session.playerBoard = placeShip(session.playerBoard, spec, coord, orientation);
   selectedShipId = nextShipToPlace(session)?.id ?? null;
-  setStatus(selectedShipId ? `${spec.name} placed. Next: ${placementSpec()?.name}.` : "Fleet ready — engage the enemy.");
+  setStatus("");
   clearPreview(playerCells);
   render();
 }
@@ -490,14 +492,14 @@ dom.randomFleet.addEventListener("click", () => {
   if (session.phase !== "placement") return;
   session.playerBoard = randomFleet();
   selectedShipId = null;
-  setStatus("Fleet placed at random — engage the enemy.");
+  setStatus("");
   render();
 });
 dom.resetFleet.addEventListener("click", () => {
   if (session.phase !== "placement") return;
   session.playerBoard = emptyBoard();
   selectedShipId = nextShipToPlace(session)?.id ?? null;
-  setStatus("Fleet cleared.");
+  setStatus("");
   render();
 });
 dom.engage.addEventListener("click", () => {
