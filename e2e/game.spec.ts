@@ -226,6 +226,7 @@ test("theatre wording carries into the status line during a battle", async ({ pa
   await page.getByLabel("Battle theatre").selectOption("mekong");
   await page.getByRole("button", { name: "Random fleet" }).click();
   await page.getByRole("button", { name: "Start battle" }).click();
+  await expect(page.locator("#status")).toContainText("fire at upriver");
   await page.locator("#ai-board .cell").nth(0).click();
   await expect(page.locator("#status")).toContainText(/You (struck|went into the water)/);
   await expect(page.locator("#status")).toContainText(/The patrol/, { timeout: 10_000 });

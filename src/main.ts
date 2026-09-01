@@ -394,7 +394,7 @@ function render(): void {
     const acc = Math.round(accuracy(session.aiBoard) * 100);
     dom.gameoverStats.textContent = playerWon
       ? `You won in ${shots} shots (${acc}% accuracy).`
-      : `The enemy sank your fleet in ${shotsFired(session.playerBoard)} shots. You fired ${shots} (${acc}% accuracy).`;
+      : `${scene.opponent} sank your fleet in ${shotsFired(session.playerBoard)} shots. You fired ${shots} (${acc}% accuracy).`;
     dom.gameoverRecord.textContent = `Record: ${stats.wins}W - ${stats.losses}L | streak ${stats.currentStreak} (best ${stats.bestStreak}).`;
     dom.rematch.focus();
   }
@@ -567,7 +567,7 @@ dom.startBattle.addEventListener("click", () => {
   setStatus(
     session.mode === "salvo"
       ? "Battle stations — pick one target per surviving ship, then fire."
-      : "Battle stations — fire at the enemy waters.",
+      : `Battle stations — fire at ${scene.enemyWaters.toLowerCase()}.`,
   );
   render();
   startClock();
