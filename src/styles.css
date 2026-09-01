@@ -44,6 +44,11 @@ body {
   gap: 0.5rem;
 }
 
+.topbar-title.hidden,
+.topbar .new-game.hidden {
+  display: none;
+}
+
 h1 {
   margin: 0;
   font-size: clamp(1.4rem, 5vw, 2rem);

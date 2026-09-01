@@ -2,6 +2,7 @@ import type { Difficulty } from "./types.js";
 
 export type VossEvent =
   | { kind: "battle-start"; difficulty: Difficulty }
+  | { kind: "resume" }
   | { kind: "player-shot"; hit: boolean; sunk: string | null; streak: number }
   | { kind: "enemy-shot"; hit: boolean; sunk: string | null }
   | { kind: "victory" }
@@ -15,6 +16,8 @@ export function vossLine(event: VossEvent): string {
   switch (event.kind) {
     case "battle-start":
       return `Conn, all stations — ${difficultyLabel(event.difficulty)} posture. Let's put the enemy under.`;
+    case "resume":
+      return "Conn, we're back on station. Systems are live and we're ready to continue.";
     case "player-shot":
       if (event.sunk) return `Conn, sonar — ${event.sunk} is burning. She's going under.`;
       if (event.streak >= 3) return `Conn, we're on a ${event.streak}-shot run. Keep the pressure on.`;

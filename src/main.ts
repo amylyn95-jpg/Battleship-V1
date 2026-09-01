@@ -27,6 +27,7 @@ function required<T extends HTMLElement>(id: string): T {
 
 const dom = {
   command: required<HTMLElement>("command-screen"),
+  topbarTitle: required<HTMLHeadingElement>("app-title"),
   difficultyButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")],
   modeButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-mode]")],
   difficultyDescription: required<HTMLElement>("difficulty-description"),
@@ -262,6 +263,8 @@ function render(): void {
   const enemySunk = session.aiBoard.ships.filter(isSunk).length;
   setIntensity(intensityLevel(playerSunk, enemySunk));
   setRadar(dom.aiWrap, screen === "battle" && session.phase === "playing" && session.turn === "human" && !aiThinking);
+  dom.topbarTitle.classList.toggle("hidden", screen === "command");
+  dom.newGame.classList.toggle("hidden", screen === "command");
   dom.boardArea.classList.toggle("hidden", screen === "command");
   dom.playerWrap.classList.toggle("hidden", screen === "command");
   dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy");
@@ -579,6 +582,9 @@ document.addEventListener("keydown", (event) => {
 });
 
 showMuteState();
+if (saved && session.phase === "playing") {
+  dom.commsLine.textContent = vossLine({ kind: "resume" });
+}
 setStatus(saved ? (session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over.") : "Choose your mission parameters.");
 render();
 if (session.phase === "playing" && session.turn === "ai") scheduleAiTurn();

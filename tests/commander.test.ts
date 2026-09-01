@@ -7,6 +7,7 @@ describe("Commander Voss comms", () => {
       vossLine({ kind: "battle-start", difficulty: "easy" }),
       vossLine({ kind: "battle-start", difficulty: "normal" }),
       vossLine({ kind: "battle-start", difficulty: "hard" }),
+      vossLine({ kind: "resume" }),
       vossLine({ kind: "player-shot", hit: true, sunk: null, streak: 1 }),
       vossLine({ kind: "player-shot", hit: false, sunk: null, streak: 0 }),
       vossLine({ kind: "player-shot", hit: true, sunk: "Cruiser", streak: 1 }),
@@ -18,6 +19,10 @@ describe("Commander Voss comms", () => {
       vossLine({ kind: "defeat" }),
     ];
     expect(lines.every((line) => line.length > 0)).toBe(true);
+  });
+
+  it("reports a restored station without requiring a live event", () => {
+    expect(vossLine({ kind: "resume" })).toContain("back on station");
   });
 
   it("names ships in sinking reports", () => {

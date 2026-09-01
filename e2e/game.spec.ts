@@ -35,11 +35,15 @@ async function engage(page: Page): Promise<void> {
 
 test("passes through the command screen", async ({ page }) => {
   await expect(page.locator("#command-screen")).toBeVisible();
+  await expect(page.locator("#app-title")).toBeHidden();
+  await expect(page.locator("#new-game")).toBeHidden();
   await expect(page.locator("#footer-hint")).toBeHidden();
   await page.getByRole("button", { name: "ADMIRAL" }).click();
   await expect(page.locator("#difficulty-description")).toContainText("Probability targeting");
   await expect(page.locator("#mode-description")).toContainText("Classic engagement");
   await page.getByRole("button", { name: "DEPLOY FLEET" }).click();
+  await expect(page.locator("#app-title")).toBeVisible();
+  await expect(page.locator("#new-game")).toBeVisible();
   await expect(page.locator("#placement-prompt")).toContainText("Carrier");
 });
 
@@ -125,6 +129,7 @@ test("resumes the AI turn when reloaded mid-think", async ({ page }) => {
   await engage(page);
   await page.locator("#ai-board .cell").nth(0).click();
   await page.reload();
+  await expect(page.locator("#comms-line")).not.toHaveText("");
   await expect(page.locator("#status")).toContainText(/The enemy (hit|missed|hit .*sank)/, { timeout: 10_000 });
   await expect(page.locator("#ai-board .cell").nth(99)).toBeEnabled();
 });

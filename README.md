@@ -1,65 +1,102 @@
-# Battleship
+# Battleship — Tactical Fleet Command
 
-Classic Battleship in the browser against an AI opponent. No backend, no accounts,
-no data leaves your machine — the whole game runs as static files.
+Battleship is a polished, browser-based fleet battle against an opponent that
+adapts its search at higher difficulty levels. It is a static client-side game:
+there is no account, server, or backend, and game progress is saved only in your
+browser.
 
-## Play
+## Play online
 
-Live: https://amylyn95-jpg.github.io/Battleship-V1/ (published by the Pages workflow on every push to `main`)
+Live game: **https://amylyn95-jpg.github.io/Battleship-V1/**
 
-Place your five ships (click to place, **R** to rotate, or hit **Random fleet**),
-press **Start battle**, then click the enemy grid to fire. First fleet sunk loses.
-An in-progress game survives a page refresh.
+## How to play
 
-## Modes
+The game has four screens:
 
-| Mode    | Rules                                                                                                                                                                                              |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Classic | One shot per turn; every shot is marked hit or miss immediately.                                                                                                                                     |
-| Salvo   | One shot per surviving ship each turn, on a 20 second clock. You are told only how many of the volley hit — splashes stay grey until a ship sinks. Run out of time and the rest of the salvo fires blind. |
+1. **Command** — choose a difficulty and engagement mode, then select
+   **DEPLOY FLEET**.
+2. **Deploy** — place the Carrier, Battleship, Cruiser, Submarine, and
+   Destroyer. Click a ship and a square, press **R** to rotate, drag a ship
+   from the dock onto the board, or use **Random fleet**.
+3. **Battle** — take turns firing at the enemy waters. Coordinate labels run
+   from A–J across the top and 1–10 down the side. Your fleet shows its damage;
+   the enemy fleet hides partial damage until the battle ends.
+4. **Debrief** — review the result, statistics, rating, and the revealed enemy
+   fleet. Choose **REMATCH** to keep the same settings or **NEW BATTLE** /
+   **CHANGE DIFFICULTY** to return to command.
 
-## Difficulty
+In **Classic** mode, each side fires one shot per turn and every result is
+shown immediately. In **Salvo** mode, you select one target per surviving ship
+and fire the volley together. A 20-second shot clock fills any missing targets
+automatically when it expires, and the enemy's partial results stay hidden until
+a ship sinks.
 
-| Level  | How the opponent picks its shot                                                                 |
-| ------ | ----------------------------------------------------------------------------------------------- |
-| Easy   | Fires at a random untried cell and never follows up on a hit.                                    |
-| Normal | Hunts on a parity lattice, then locks onto a ship's axis and finishes it off.                     |
-| Hard   | Same follow-up logic, but hunts by counting how many legal ship placements cover each cell.       |
+### Controls and accessibility
 
-The opponent only ever sees the results of its own shots — it cannot read your board.
+- Mouse or touch: click a square to place or fire.
+- Keyboard: use arrow keys to move between squares, **Enter** or **Space** to
+  activate the focused square, and **R** to rotate a ship during deployment.
+- Drag and drop: drag a ship from the deployment dock onto the desired square.
+- Sound: use the sound button on the command screen to mute or restore effects.
+- Reduced motion: when the browser requests reduced motion, animated effects
+  become still or disappear while all game actions remain available.
+- Refreshing during a battle restores the saved match and returns it to play.
+
+## Opponent difficulty
+
+The opponent never reads your ship layout. It only learns from the results of
+its own shots.
+
+| Difficulty | What it does |
+| --- | --- |
+| **Recruit** | Fires at a random square it has not tried before. It does not chase a hit. |
+| **Tactical** | Searches in a regular pattern, then follows a hit along the ship's likely direction until the ship is found. |
+| **Admiral** | Uses the same follow-up search, but first scores each possible square by how many legal ship placements could cover it. It chooses the most promising square. |
 
 ## Development
 
+Install the tools once, then run commands from the repository folder:
+
 ```bash
 npm install
-npm run dev        # local dev server
-npm test           # unit + AI self-play tests (Vitest)
-npm run e2e        # browser tests (Playwright, desktop + mobile viewports)
-npm run lint       # ESLint
-npm run typecheck  # tsc --noEmit
-npm run build      # production bundle into dist/
+npm run dev        # start the local game at http://localhost:5173/
+npm run lint       # check code style
+npm run typecheck  # check TypeScript types
+npm test           # run unit and AI tests
+npm run e2e        # run browser tests on desktop and mobile
+npm run build      # create the production files in dist/
 ```
 
-## Layout
+The unit tests check the game rules, session saving, statistics, audio/effect
+helpers, and opponent decisions. The browser tests open the real game and check
+the screens and interactions, including reloads and reduced-motion play.
 
-| File              | Responsibility                                                       |
-| ----------------- | -------------------------------------------------------------------- |
-| `src/types.ts`    | Shared types, board size, fleet definition.                          |
-| `src/board.ts`    | Grid maths: placement validation, random fleets, sunk detection.      |
-| `src/game.ts`     | Resolving a single shot and deriving stats.                          |
-| `src/ai.ts`       | Opponent search: hunt, target, probability density.                  |
-| `src/session.ts`  | Turn order, win detection, save/restore.                             |
-| `src/ui.ts`       | Turning board state into DOM classes.                                |
-| `src/main.ts`     | Event wiring.                                                        |
+## Project layout
 
-Game rules and AI logic never touch the DOM, which is what makes them testable in
-isolation.
+| Location | Purpose |
+| --- | --- |
+| `index.html` / `src/styles.css` | Page structure and visual design. |
+| `src/types.ts` | Shared names for ships, coordinates, turns, and results. |
+| `src/board.ts` | Placement rules, board updates, random fleets, and sunk ships. |
+| `src/game.ts` | Shot resolution and end-of-game statistics. |
+| `src/ai.ts` | Recruit, Tactical, and Admiral opponent decisions. |
+| `src/session.ts` | Turn order, saving, restoring, logs, and timers. |
+| `src/views/` | Rendering for command, deployment, battle, and debrief screens. |
+| `src/ui.ts` | Board cells, fleet status, and coordinate labels. |
+| `src/effects.ts` / `src/sound.ts` | Decorative visual effects and procedural sounds. |
+| `src/commander.ts` | Commander Voss's deterministic radio messages. |
+| `src/main.ts` | Connects the screens, controls, session, and game actions. |
+| `tests/` | Fast unit tests. |
+| `e2e/` | Playwright tests in a real browser. |
+
+The rules and opponent logic are kept separate from the page, so they can be
+tested without opening a browser.
 
 ## Deployment
 
-Pushing to `main` runs the tests and publishes `dist/` to GitHub Pages
-(`.github/workflows/deploy.yml`). Enable it once under **Settings → Pages →
-Source: GitHub Actions**.
+The GitHub Pages workflow in `.github/workflows/deploy.yml` runs when changes
+are pushed to `main`. It installs dependencies, runs the unit tests, builds the
+production bundle with the Pages path, and publishes `dist/` to GitHub Pages.
 
-See [`BUGS.md`](./BUGS.md) for the bugs found while building this and how each was
-diagnosed, fixed, and verified.
+See [`DEBUGGING.md`](./DEBUGGING.md) for the real bugs found while building the
+game and how each one was discovered, fixed, and verified.
