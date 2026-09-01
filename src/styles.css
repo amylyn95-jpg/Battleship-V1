@@ -16,6 +16,12 @@
   --foam: #eaf6ff;
   --cell: clamp(24px, 7.5vw, 38px);
   --page: 1260px;
+  /* Theatre hooks: the page wash, the top bar and the landscape band. Each
+     theatre below overrides these plus the palette above. */
+  --page-bg: radial-gradient(circle at 20% 0%, #14456b 0%, #071a2b 60%);
+  --bar-bg: linear-gradient(#0b2338 70%, rgba(11, 35, 56, 0.85));
+  --sky: linear-gradient(#20597f, #0d2b45);
+  --land: none;
 }
 
 * {
@@ -26,7 +32,7 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at 20% 0%, #14456b 0%, #071a2b 60%);
+  background: var(--page-bg);
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -50,7 +56,7 @@ body {
   gap: 0.5rem;
   padding: 0.6rem 0;
   border-bottom: 1px solid var(--grid-line);
-  background: linear-gradient(#0b2338 70%, rgba(11, 35, 56, 0.85));
+  background: var(--bar-bg);
 }
 
 h1 {
@@ -813,7 +819,7 @@ footer {
     top: 0;
     z-index: 4;
     /* Opaque, since it now scrolls over the boards. */
-    background: #0d2b45;
+    background: var(--sea);
   }
 }
 
@@ -850,5 +856,114 @@ footer {
   #fire-salvo,
   #start-battle {
     min-height: 2.5rem;
+  }
+
+  .horizon {
+    height: 70px;
+  }
+}
+
+/* ---- Theatres ----------------------------------------------------------
+   Each theatre is a palette plus a landscape band above the boards. The
+   landscapes are inline SVG in the stylesheet, so there is nothing to
+   download and no image licensing to worry about. */
+.theatre-place {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+/* Coastline the battle is fought off: sky wash behind, land silhouette in
+   front, sized to the band so it always meets the horizon. */
+.horizon {
+  width: 100%;
+  height: 108px;
+  border: 1px solid var(--grid-line);
+  border-radius: 8px;
+  background:
+    var(--land) bottom center / 100% 100% no-repeat,
+    var(--sky);
+  box-shadow: inset 0 -14px 22px -14px rgba(0, 0, 0, 0.55);
+}
+
+/* Pacific, 1944 — volcanic island, palms, airstrip tower, task force. */
+body[data-theatre="pacific"] {
+  --sky: linear-gradient(#3f7ea8 0%, #8fc0d8 55%, #cfe4ed 100%);
+  --land: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 180' preserveAspectRatio='none'><g fill='%232c5c48'><path d='M120 150 300 46 470 150z'/><path d='M760 150 900 74 1040 150z'/></g><g fill='%231e4335'><path d='M300 46 470 150 372 150z'/><path d='M900 74 1040 150 962 150z'/></g><g stroke='%231b3b2c' stroke-width='4' fill='none'><path d='M560 150v-30'/><path d='M600 150v-34'/><path d='M660 150v-26'/></g><g fill='%23276b4d'><path d='M560 120c-16-10-28-6-34 2 12-2 22 0 34 4zm0 0c16-10 28-6 34 2-12-2-22 0-34 4z'/><path d='M600 116c-18-11-31-7-38 2 13-2 25 0 38 5zm0 0c18-11 31-7 38 2-13-2-25 0-38 5z'/><path d='M660 124c-15-9-26-6-32 2 11-2 21 0 32 4zm0 0c15-9 26-6 32 2-11-2-21 0-32 4z'/></g><g fill='%23bcae8c'><path d='M690 150v-24h34v24z'/><path d='M700 126v-16h14v16z'/></g><rect x='0' y='150' width='1200' height='30' fill='%231c4a68'/><g fill='%23253b47'><path d='M150 150h150l-14 12H164z'/><path d='M210 138h10v12h-10z'/><path d='M900 150h110l-10 10H910z'/></g><g fill='%23e9f3f6' opacity='.75'><path d='M430 40c8-4 14-2 18 2-6 0-12 1-18-2zm90 12c8-4 14-2 18 2-6 0-12 1-18-2z'/></g></svg>");
+  --page-bg: radial-gradient(circle at 20% 0%, #14456b 0%, #071a2b 60%);
+}
+
+/* Age of Sail, 1782 — chalk cliffs, a Channel village, oaks, ships of the
+   line. Parchment palette and ink lines rather than steel and radar. */
+body[data-theatre="sail"] {
+  --sea: #2d4a57;
+  --sea-light: #3f6472;
+  --grid-line: #8a7449;
+  --ship: #a3855c;
+  --ship-dark: #6f5836;
+  --ship-deck: #cbae7c;
+  --hit: #c9622a;
+  --sunk: #7a2f16;
+  --miss: #d8c9a5;
+  --splash: #9a8f74;
+  --text: #f3e6c8;
+  --accent: #d8b45f;
+  --target: #e0a83c;
+  --foam: #f7eed6;
+  --page-bg: radial-gradient(circle at 25% 0%, #3b3020 0%, #17120b 65%);
+  --bar-bg: linear-gradient(#241d13 70%, rgba(36, 29, 19, 0.85));
+  --sky: linear-gradient(#c8b184 0%, #e3d3ab 60%, #f0e5c6 100%);
+  --land: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 180' preserveAspectRatio='none'><path d='M0 150V96l90-34 78 30 96-22 84 30V150z' fill='%23efe6cd'/><path d='M0 150V120l120-24 92 22 106-18 74 24V150z' fill='%23d9cba6'/><g fill='%235c4a2c'><path d='M470 150v-26h56v26z'/><path d='M498 124l-34 8 34-22 34 22z'/><path d='M560 150v-40h40v40z'/><path d='M580 110l-30 6 30-18 30 18z'/><path d='M636 150v-56h16v56z'/><path d='M644 94l-16 6 16-30 16 30z'/></g><g stroke='%233f3218' stroke-width='5' fill='none'><path d='M700 150v-22'/><path d='M760 150v-18'/><path d='M830 150v-24'/></g><g fill='%234f6b34'><circle cx='700' cy='120' r='18'/><circle cx='760' cy='126' r='15'/><circle cx='830' cy='118' r='20'/></g><rect x='0' y='150' width='1200' height='30' fill='%232d4a57'/><g fill='%233b2f1c'><path d='M930 150h130l-12 12H942z'/><path d='M990 82l40 60h-40zm-6 0-38 60h38z' opacity='.9'/><path d='M956 96l30 46h-30z' opacity='.9'/><path d='M1120 150h70l-8 10h-54z'/><path d='M1156 108l24 34h-24zm-6 0-22 34h22z' opacity='.9'/></g><g stroke='%233b2f1c' stroke-width='4' fill='none'><path d='M986 150V78'/><path d='M960 150V94'/><path d='M1152 150v-46'/></g><g fill='%233f3218' opacity='.6'><path d='M300 36c8-5 14-3 18 2-6-1-12 0-18-2zm44 14c8-5 14-3 18 2-6-1-12 0-18-2z'/></g></svg>");
+}
+
+/* North Atlantic, 1941 — storm sky, a lighthouse headland, spruce, pack ice
+   and a convoy under escort. Cold slate with radar-green accents. */
+body[data-theatre="atlantic"] {
+  --sea: #142230;
+  --sea-light: #22394b;
+  --grid-line: #37505f;
+  --ship: #7d8a92;
+  --ship-dark: #4d5860;
+  --ship-deck: #9aa6ad;
+  --hit: #d9542f;
+  --sunk: #7c2415;
+  --miss: #adbcc6;
+  --splash: #5f7684;
+  --text: #e6eef3;
+  --accent: #63d68a;
+  --target: #63d68a;
+  --page-bg: radial-gradient(circle at 30% 0%, #1b3040 0%, #04090f 65%);
+  --bar-bg: linear-gradient(#0a151d 70%, rgba(10, 21, 29, 0.85));
+  --sky: linear-gradient(#3c4c5a 0%, #6d7d89 60%, #93a2ab 100%);
+  --land: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 180' preserveAspectRatio='none'><g fill='%233b4a55' opacity='.65'><ellipse cx='260' cy='40' rx='210' ry='34'/><ellipse cx='760' cy='30' rx='250' ry='30'/></g><path d='M0 150V104l90-26 70 20 90-30 80 34V150z' fill='%23303f49'/><g fill='%23e8f1f4'><path d='M150 150v-46h20v46z'/><path d='M146 104h28l-14-14z'/></g><g fill='%231f3a2c'><path d='M240 150l16-40 16 40z'/><path d='M280 150l14-34 14 34z'/><path d='M318 150l12-28 12 28z'/></g><rect x='0' y='150' width='1200' height='30' fill='%23142230'/><g fill='%23dfeaf0'><path d='M470 150l30-26 26 26z'/><path d='M540 150l40-18 34 18z'/><path d='M1080 150l34-22 30 22z'/></g><g fill='%23222f38'><path d='M700 148h120l-12 10H712z'/><path d='M746 138h16v10h-16z'/><path d='M860 148h90l-9 9h-72z'/><path d='M990 148h70l-8 8h-54z'/></g></svg>");
+}
+
+/* Mekong Delta, 1968 — jungle hills, palms and banana groves, stilt huts on
+   the bank, river patrol boats. Humid green with a haze over the water. */
+body[data-theatre="mekong"] {
+  --sea: #22412f;
+  --sea-light: #33573c;
+  --grid-line: #4d7048;
+  --ship: #8b9270;
+  --ship-dark: #5b6247;
+  --ship-deck: #a9b189;
+  --hit: #e2762c;
+  --sunk: #7c3a13;
+  --miss: #cddfbe;
+  --splash: #7d9a7a;
+  --text: #eef6e6;
+  --accent: #c3d94a;
+  --target: #f0d24a;
+  --page-bg: radial-gradient(circle at 25% 0%, #2c4a2c 0%, #0b1610 65%);
+  --bar-bg: linear-gradient(#14261a 70%, rgba(20, 38, 26, 0.85));
+  --sky: linear-gradient(#7d9a5f 0%, #b9c98a 55%, #dfe4bd 100%);
+  --land: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 180' preserveAspectRatio='none'><path d='M0 130 160 74 340 122 520 62 700 120 880 78 1060 124 1200 88V150H0z' fill='%232f5233' opacity='.85'/><path d='M0 150V126l150-18 160 16 170-20 180 22 170-16 170 18 200-14V150z' fill='%23244227'/><g stroke='%232b3f22' stroke-width='5' fill='none'><path d='M120 150v-34'/><path d='M180 150v-28'/><path d='M900 150v-32'/><path d='M960 150v-26'/></g><g fill='%233c7a3c'><path d='M120 116c-20-12-36-8-44 2 16-3 28 0 44 5zm0 0c20-12 36-8 44 2-16-3-28 0-44 5zm0-4c-8-14-4-24 4-30 0 12 0 20-4 30z'/><path d='M180 122c-18-11-32-7-39 2 14-3 25 0 39 5zm0 0c18-11 32-7 39 2-14-3-25 0-39 5z'/><path d='M900 118c-19-12-34-8-41 2 15-3 26 0 41 5zm0 0c19-12 34-8 41 2-15-3-26 0-41 5z'/><path d='M960 124c-17-10-30-7-36 2 13-2 23 0 36 5zm0 0c17-10 30-7 36 2-13-2-23 0-36 5z'/></g><g fill='%23356b33'><path d='M400 150c-22 0-30-16-30-30 12 8 22 18 30 30zm0 0c22 0 30-16 30-30-12 8-22 18-30 30zm0 0c-10-14-8-30 0-40 8 10 10 26 0 40z'/><path d='M470 150c-18 0-25-13-25-25 10 7 18 15 25 25zm0 0c18 0 25-13 25-25-10 7-18 15-25 25z'/></g><g fill='%23705a34'><path d='M560 150v-30h90v30z'/><path d='M552 120h106l-53-22z' fill='%235d4a2a'/><path d='M572 150v14h6v-14zm66 0v14h6v-14z'/><path d='M700 150v-22h64v22z'/><path d='M694 128h76l-38-16z' fill='%235d4a2a'/></g><rect x='0' y='150' width='1200' height='30' fill='%2322412f'/><g fill='%23283b28'><path d='M240 152h96l-10 10h-76z'/><path d='M280 142h14v10h-14z'/><path d='M1020 152h80l-8 9h-64z'/></g><g fill='%23dfe4bd' opacity='.6'><path d='M640 44c10-5 17-3 22 2-8-1-15 0-22-2zm60 10c10-5 17-3 22 2-8-1-15 0-22-2z'/></g></svg>");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horizon {
+    box-shadow: none;
   }
 }

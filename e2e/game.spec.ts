@@ -203,6 +203,34 @@ test("fits the viewport without sideways scrolling", async ({ page }) => {
   expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
 });
 
+test("theatre reskins the page, renames the fleet and survives a reload", async ({ page }) => {
+  await expect(page.locator("body")).toHaveAttribute("data-theatre", "pacific");
+  await expect(page.locator("#dock")).toContainText("Carrier (5)");
+
+  await page.getByLabel("Battle theatre").selectOption("sail");
+  await expect(page.locator("body")).toHaveAttribute("data-theatre", "sail");
+  await expect(page.locator("#dock")).toContainText("Ship of the Line (5)");
+  await expect(page.locator("#player-heading")).toHaveText("Your squadron");
+  await expect(page.locator("#theatre-place")).toContainText("English Channel");
+
+  // The landscape band is only decoration, so it must not push the boards off.
+  const horizon = page.locator("#horizon");
+  await expect(horizon).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("body")).toHaveAttribute("data-theatre", "sail");
+  await expect(page.locator("#theatre")).toHaveValue("sail");
+});
+
+test("theatre wording carries into the status line during a battle", async ({ page }) => {
+  await page.getByLabel("Battle theatre").selectOption("mekong");
+  await page.getByRole("button", { name: "Random fleet" }).click();
+  await page.getByRole("button", { name: "Start battle" }).click();
+  await page.locator("#ai-board .cell").nth(0).click();
+  await expect(page.locator("#status")).toContainText(/You (struck|went into the water)/);
+  await expect(page.locator("#status")).toContainText(/The patrol/, { timeout: 10_000 });
+});
+
 test("restores an in-progress game after reload", async ({ page }) => {
   await page.getByRole("button", { name: "Random fleet" }).click();
   await page.getByRole("button", { name: "Start battle" }).click();

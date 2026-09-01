@@ -10,8 +10,17 @@
   </head>
   <body>
     <header class="topbar">
-      <h1>Battleship</h1>
+      <h1>Battleship <small id="theatre-place" class="theatre-place"></small></h1>
       <div class="controls">
+        <span class="control">
+          <label for="theatre">Theatre</label>
+          <select id="theatre" aria-label="Battle theatre">
+            <option value="pacific" selected>Pacific, 1944</option>
+            <option value="sail">Age of Sail, 1782</option>
+            <option value="atlantic">North Atlantic, 1941</option>
+            <option value="mekong">Mekong Delta, 1968</option>
+          </select>
+        </span>
         <span class="control">
           <label for="difficulty">Difficulty</label>
           <select id="difficulty" aria-label="AI difficulty">
@@ -41,7 +50,7 @@
           <ol id="steps" class="steps" aria-label="How to play">
             <li id="step-place" class="step"><span class="step-num">1</span> Place your fleet</li>
             <li id="step-start" class="step"><span class="step-num">2</span> Start battle</li>
-            <li id="step-fire" class="step"><span class="step-num">3</span> Fire at enemy waters</li>
+            <li id="step-fire" class="step"><span class="step-num">3</span> <span id="step-fire-label">Fire at enemy waters</span></li>
           </ol>
         </section>
 
@@ -78,6 +87,7 @@
       </aside>
 
       <section class="arena" aria-label="Battle">
+        <div id="horizon" class="horizon" aria-hidden="true"></div>
         <div class="arena-bar">
           <p id="status" class="status" role="status" aria-live="polite"></p>
           <div id="salvo-bar" class="salvo-bar hidden">
@@ -89,13 +99,13 @@
 
         <div class="boards">
           <section class="board-wrap">
-            <h2>Your waters</h2>
+            <h2 id="player-heading">Your waters</h2>
             <div id="player-board" class="board" role="grid" aria-label="Your fleet"></div>
             <ul id="player-fleet" class="fleet"></ul>
           </section>
 
           <section class="board-wrap">
-            <h2>Enemy waters</h2>
+            <h2 id="ai-heading">Enemy waters</h2>
             <div id="ai-board" class="board" role="grid" aria-label="Enemy waters"></div>
             <ul id="ai-fleet" class="fleet"></ul>
           </section>

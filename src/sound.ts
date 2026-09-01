@@ -4,10 +4,86 @@
  * the first effect because browsers refuse to start audio before a gesture.
  */
 
+import type { TheatreId } from "./theatre.js";
+
 const STORAGE_KEY = "battleship.muted";
+
+/**
+ * How a theatre's ordnance sounds. Same synthesis, different powder: black
+ * powder booms low with a long rolling tail, 1940s naval guns crack higher and
+ * drier, and river patrols carry rotor noise.
+ */
+interface SoundProfile {
+  fireType: OscillatorType;
+  fireFrom: number;
+  fireTo: number;
+  /** Centre frequency of the muzzle blast noise. */
+  fireBody: number;
+  /** Centre frequency of the water splash on a miss. */
+  splash: number;
+  /** Centre frequency of the explosion on a hit. */
+  blast: number;
+  hitType: OscillatorType;
+  tail: "none" | "rumble" | "rotor";
+  /** Adds a returning sonar ping after a miss. */
+  ping: boolean;
+}
+
+const PROFILES: Readonly<Record<TheatreId, SoundProfile>> = {
+  pacific: {
+    fireType: "square",
+    fireFrom: 180,
+    fireTo: 60,
+    fireBody: 700,
+    splash: 900,
+    blast: 1400,
+    hitType: "sawtooth",
+    tail: "none",
+    ping: false,
+  },
+  sail: {
+    fireType: "triangle",
+    fireFrom: 120,
+    fireTo: 34,
+    fireBody: 380,
+    splash: 700,
+    blast: 800,
+    hitType: "triangle",
+    tail: "rumble",
+    ping: false,
+  },
+  atlantic: {
+    fireType: "square",
+    fireFrom: 200,
+    fireTo: 70,
+    fireBody: 620,
+    splash: 1100,
+    blast: 1200,
+    hitType: "sawtooth",
+    tail: "none",
+    ping: true,
+  },
+  mekong: {
+    fireType: "sawtooth",
+    fireFrom: 240,
+    fireTo: 90,
+    fireBody: 900,
+    splash: 1300,
+    blast: 1600,
+    hitType: "sawtooth",
+    tail: "rotor",
+    ping: false,
+  },
+};
 
 let ctx: AudioContext | null = null;
 let muted = readMuted();
+let profile: SoundProfile = PROFILES.pacific;
+
+/** Switches the era the effects are synthesized for. */
+export function setSoundTheatre(id: TheatreId): void {
+  profile = PROFILES[id];
+}
 
 function readMuted(): boolean {
   try {
@@ -92,37 +168,53 @@ function noise(
   source.start(start);
 }
 
-/** Cannon report, played as a shot leaves the tube. */
+/** Gun report, played as a shot leaves the tube. */
 export function playFire(): void {
   const ac = audio();
   if (!ac) return;
-  tone(ac, { type: "square", from: 180, to: 60, duration: 0.12, gain: 0.12 });
-  noise(ac, { duration: 0.18, gain: 0.1, frequency: 700 });
+  const { fireType, fireFrom, fireTo, fireBody } = profile;
+  tone(ac, { type: fireType, from: fireFrom, to: fireTo, duration: 0.12, gain: 0.12 });
+  noise(ac, { duration: 0.18, gain: 0.1, frequency: fireBody });
+  // Powder-era guns are followed by rolling smoke and rigging noise; the modern
+  // theatres get a short mechanical tail instead.
+  if (profile.tail === "rumble") {
+    noise(ac, { duration: 0.6, gain: 0.06, frequency: 260, delay: 0.1 });
+  } else if (profile.tail === "rotor") {
+    tone(ac, { type: "square", from: 60, to: 44, duration: 0.5, gain: 0.05, delay: 0.05 });
+  }
 }
 
 /** Water splash for a shot that hits nothing. */
 export function playMiss(): void {
   const ac = audio();
   if (!ac) return;
-  noise(ac, { duration: 0.35, gain: 0.14, filter: "highpass", frequency: 900 });
+  noise(ac, { duration: 0.35, gain: 0.14, filter: "highpass", frequency: profile.splash });
   tone(ac, { type: "sine", from: 320, to: 140, duration: 0.2, gain: 0.06 });
+  // A returning sonar ping is what a miss sounds like on a 1941 escort.
+  if (profile.ping) {
+    tone(ac, { type: "sine", from: 1180, to: 1180, duration: 0.22, gain: 0.07, delay: 0.18 });
+  }
 }
 
 /** Explosion for a shot that lands on a hull. */
 export function playHit(): void {
   const ac = audio();
   if (!ac) return;
-  noise(ac, { duration: 0.5, gain: 0.25, frequency: 1400 });
-  tone(ac, { type: "sawtooth", from: 240, to: 40, duration: 0.4, gain: 0.18 });
+  noise(ac, { duration: 0.5, gain: 0.25, frequency: profile.blast });
+  tone(ac, { type: profile.hitType, from: 240, to: 40, duration: 0.4, gain: 0.18 });
 }
 
 /** Deeper, longer groan when a whole ship goes down. */
 export function playSunk(): void {
   const ac = audio();
   if (!ac) return;
-  noise(ac, { duration: 0.9, gain: 0.28, frequency: 900 });
-  tone(ac, { type: "sawtooth", from: 180, to: 28, duration: 0.85, gain: 0.22 });
+  noise(ac, { duration: 0.9, gain: 0.28, frequency: profile.blast * 0.65 });
+  tone(ac, { type: profile.hitType, from: 180, to: 28, duration: 0.85, gain: 0.22 });
   tone(ac, { type: "triangle", from: 90, to: 30, duration: 1, gain: 0.16, delay: 0.1 });
+  // Timber hulls go down groaning rather than tearing.
+  if (profile.tail === "rumble") {
+    tone(ac, { type: "sine", from: 140, to: 52, duration: 1.1, gain: 0.12, delay: 0.2 });
+  }
 }
 
 /** Rising fanfare on a win. */
