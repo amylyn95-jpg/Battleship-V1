@@ -130,6 +130,17 @@ function resultKind(result: ShotResult): "hit" | "miss" | "sunk" {
   return result.hit ? "hit" : "miss";
 }
 
+function restoredStatus(savedSession: Session | null): string {
+  if (!savedSession) return "Choose your mission parameters.";
+  if (savedSession.phase === "placement") return "Fleet restored — finish deploying your ships.";
+  if (savedSession.phase !== "playing") return "Game over.";
+  if (savedSession.turn === "ai") return "Game restored — enemy is returning fire.";
+  if (savedSession.mode !== "salvo" && savedSession.aiShots.length > 0) {
+    return describe(savedSession.aiShots.at(-1)!, "The enemy");
+  }
+  return "Game restored — fire at the enemy waters.";
+}
+
 function playerShotEffects(results: readonly ShotResult[]): void {
   const salvo = session.mode === "salvo";
   for (const result of results) {
@@ -653,12 +664,7 @@ showMuteState();
 if (saved && session.phase === "playing") {
   dom.commsLine.textContent = vossLine({ kind: "resume" });
 }
-const restoredStatus = saved && session.phase === "playing" && session.aiShots.length > 0
-  ? describe(session.aiShots[session.aiShots.length - 1]!, "The enemy")
-  : saved
-    ? session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over."
-    : "Choose your mission parameters.";
-setStatus(restoredStatus);
+setStatus(restoredStatus(saved));
 document.body.dataset.view = viewMode;
 void setViewMode(viewMode);
 if (session.phase === "playing" && session.turn === "ai") scheduleAiTurn();
