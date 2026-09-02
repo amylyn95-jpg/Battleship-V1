@@ -3,7 +3,14 @@ import type { Board, Coord, Ship, ShotResult, TheatreId } from "../types.js";
 import type { Session } from "../session.js";
 import { gridToWorld, worldToGrid, type BoardSide } from "./grid.js";
 import { createImpact, createDamageEffect, type FxVisual, updateDamageEffect, updateFx } from "./fx.js";
-import { createProjectile, updateProjectile, type ProjectileFlight } from "./projectiles.js";
+import {
+  createProjectile,
+  createProjectileTrail,
+  updateProjectile,
+  updateProjectileTrail,
+  type ProjectileFlight,
+  type ProjectileTrail,
+} from "./projectiles.js";
 import { createScene, disposeObject, type SceneRig } from "./scene.js";
 import { buildShip, damageStage, hitPosition, sinkEasing, updateShipPose } from "./ships.js";
 import { theatreConfig } from "./theatres.js";
@@ -29,8 +36,10 @@ interface ShipVisual {
 
 interface ImpactFlight {
   readonly flight: ProjectileFlight;
+  readonly trail: ProjectileTrail | null;
   readonly target: THREE.Vector3;
   readonly kind: "neutral" | "hit" | "sunk";
+  impactStarted: boolean;
 }
 
 function marker(coord: Coord, side: BoardSide, color: string): THREE.Mesh {
@@ -190,12 +199,23 @@ export function createDirector(
     }
     for (let index = projectiles.length - 1; index >= 0; index--) {
       const flight = projectiles[index]!;
-      if (!updateProjectile(flight.flight, now)) continue;
-      rig.scene.remove(flight.flight.group);
-      disposeObject(flight.flight.group);
-      const impact = createImpact(flight.kind, flight.target, now);
-      rig.scene.add(impact.group);
-      impacts.push(impact);
+      const arrived = flight.impactStarted || updateProjectile(flight.flight, now);
+      const trailDone = flight.trail
+        ? updateProjectileTrail(flight.trail, flight.flight.group.position, now, arrived)
+        : true;
+      if (arrived && !flight.impactStarted) {
+        rig.scene.remove(flight.flight.group);
+        disposeObject(flight.flight.group);
+        const impact = createImpact(flight.kind, flight.target, now);
+        rig.scene.add(impact.group);
+        impacts.push(impact);
+        flight.impactStarted = true;
+      }
+      if (!arrived || !trailDone) continue;
+      if (flight.trail) {
+        rig.scene.remove(flight.trail.group);
+        disposeObject(flight.trail.group);
+      }
       projectiles.splice(index, 1);
     }
     for (let index = impacts.length - 1; index >= 0; index--) {
@@ -221,8 +241,10 @@ export function createDirector(
       return;
     }
     const flight = createProjectile(theatre.projectile, from, to, performance.now());
+    const trail = !staticMode && rig.trailEnabled ? createProjectileTrail() : null;
     rig.scene.add(flight.group);
-    projectiles.push({ flight, target: new THREE.Vector3(to.x, to.y, to.z), kind });
+    if (trail) rig.scene.add(trail.group);
+    projectiles.push({ flight, trail, target: new THREE.Vector3(to.x, to.y, to.z), kind, impactStarted: false });
   };
 
   return {

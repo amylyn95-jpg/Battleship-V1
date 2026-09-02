@@ -20,7 +20,7 @@ export function createImpact(kind: ImpactVisualKind, position: THREE.Vector3, no
   const foam = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.0, 24), material("#d8f4ef", 0.8));
   foam.rotation.x = -Math.PI / 2;
   group.add(foam);
-  const plumeHeight = kind === "sunk" ? 26 : 17;
+  const plumeHeight = kind === "sunk" ? 26 : kind === "neutral" ? 22 : 17;
   const plume = new THREE.Mesh(
     new THREE.CylinderGeometry(kind === "sunk" ? 2.4 : 1.5, kind === "sunk" ? 3.4 : 2.2, plumeHeight, 14, 1, true),
     material("#f4f8f2", 0.66),
@@ -37,6 +37,24 @@ export function createImpact(kind: ImpactVisualKind, position: THREE.Vector3, no
     fire.name = "fireball";
     fire.position.y = 3.2;
     group.add(fire);
+    const flash = new THREE.Mesh(
+      new THREE.SphereGeometry(kind === "sunk" ? 4.8 : 3.6, 14, 10),
+      material("#ffe29a", 0.95),
+    );
+    flash.name = "airburst-flash";
+    flash.position.y = kind === "sunk" ? 13 : 11;
+    (flash.material as THREE.MeshBasicMaterial).depthTest = false;
+    flash.renderOrder = 2;
+    group.add(flash);
+    const shockwave = new THREE.Mesh(
+      new THREE.RingGeometry(kind === "sunk" ? 3.5 : 2.6, kind === "sunk" ? 3.9 : 3.0, 32),
+      material("#ffd36a", 0.72),
+    );
+    shockwave.name = "airburst-shockwave";
+    shockwave.position.y = kind === "sunk" ? 13 : 11;
+    (shockwave.material as THREE.MeshBasicMaterial).depthTest = false;
+    shockwave.renderOrder = 2;
+    group.add(shockwave);
   }
   group.position.copy(position);
   return {
@@ -79,6 +97,20 @@ export function updateFx(visual: FxVisual, now: number): boolean {
   if (spray) spray.scale.setScalar(0.6 + t * 1.1);
   const fire = visual.group.getObjectByName("fireball");
   if (fire) fire.scale.setScalar(1 + Math.sin(t * Math.PI) * 0.7);
+  const flash = visual.group.getObjectByName("airburst-flash");
+  if (flash) {
+    const burst = Math.max(0, Math.min(1, age / 900));
+    flash.scale.setScalar(0.35 + burst * 2.4);
+    const material = (flash as THREE.Mesh).material as THREE.MeshBasicMaterial;
+    material.opacity = 0.95 * (1 - burst);
+  }
+  const shockwave = visual.group.getObjectByName("airburst-shockwave");
+  if (shockwave) {
+    const burst = Math.max(0, Math.min(1, age / 900));
+    shockwave.scale.setScalar(0.35 + burst * 2.8);
+    const material = (shockwave as THREE.Mesh).material as THREE.MeshBasicMaterial;
+    material.opacity = 0.72 * (1 - burst);
+  }
   if (visual.persistent && age >= visual.duration) {
     const fade = Math.max(0, 1 - (age - visual.duration) / visual.fadeDuration);
     visual.group.traverse((object) => {

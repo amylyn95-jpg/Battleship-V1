@@ -31,6 +31,7 @@ export interface SceneRig {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera: THREE.PerspectiveCamera;
   readonly ocean: THREE.Mesh;
+  readonly trailEnabled: boolean;
   render(force?: boolean): void;
   setTheatre(theatre: Theatre): void;
   setRig(rig: CameraRigId): void;
@@ -149,6 +150,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     renderer,
     camera,
     ocean,
+    trailEnabled: !softwareRenderer && !(window.matchMedia?.("(max-width: 700px)").matches ?? false),
     render(force = false): void {
       if (document.hidden) return;
       if (staticMode && renderedStatic && !force) return;
@@ -184,9 +186,9 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     focusImpact(coord, side): void {
       const point = gridToWorld(coord, side);
       impact = {
-        position: new THREE.Vector3(point.x * 0.45, 44, point.z + 104),
-        target: new THREE.Vector3(point.x, 2, point.z),
-        until: performance.now() + 1200,
+        position: new THREE.Vector3(point.x * 0.45, 26, point.z + 104),
+        target: new THREE.Vector3(point.x, 12, point.z),
+        until: performance.now() + 1800,
       };
       if (staticMode) {
         camera.position.copy(impact.position);
