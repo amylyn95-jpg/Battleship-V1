@@ -81,7 +81,10 @@ Player may hover other cells throughout; input to *fire* is locked until TURN.
 | 300 | Silhouette gets a glowing ember decal at the segment | Battle log: "C5 — direct hit on unknown ship." | crackle loop fades in |
 | 1400 | Done | — | — |
 
-If HIT is followed by SUNK, SUNK starts at 600 ms into HIT (overlap), total ≤ 3.5 s.
+If HIT is followed by SUNK, SUNK starts at 600 ms into HIT (overlap) and HIT's
+remaining beats run underneath it. Only the first **1.6 s** of SUNK (list + rise)
+blocks the turn; the slide-under and slick tail (1.6-3.5 s) plays on while the
+enemy's ANALYZING/INCOMING beats begin, so the turn budget is not exceeded (see §7).
 
 ---
 
@@ -89,10 +92,11 @@ If HIT is followed by SUNK, SUNK starts at 600 ms into HIT (overlap), total ≤ 
 
 | t (ms) | World | HUD | Audio |
 | --- | --- | --- | --- |
-| 0 | Camera: 1.2 s move toward the enemy line (pan 6°, push 8 %), holds, returns during 2400-3500 | grid: all ship cells switch to **wreck** stamp; ship silhouette in the enemy roster turns red | deep groan (`playSunk`) |
+| 0 | Camera: 1.2 s move toward the enemy line (pan 6°, push 8 %), holds, returns during 1600-2800 | grid: all ship cells switch to **wreck** stamp; ship silhouette in the enemy roster turns red | deep groan (`playSunk`) |
 | 0-900 | Hull lists 25° toward the hit side (ease in) | "ENEMY CRUISER SUNK" banner | secondary explosion at 400 |
-| 900-1800 | Bow (or stern, alternating) rises 12 m; waterline foam and a 3 m/s spray sheet | fleet status: enemy ships 4 → 3 | steam hiss |
-| 1800-3000 | Slides under along its length; oil slick decal expands 0→90 m; 6 flotsam billboards spawn and bob (they sample the wave function) | Voss line if tension changed | bubbles, then quiet |
+| 900-1600 | Bow (or stern, alternating) rises 12 m; waterline foam and a 3 m/s spray sheet | fleet status: enemy ships 4 → 3 | steam hiss |
+| **1600** | **Blocking part ends**; Director may start the enemy's turn. Camera begins its return here | — | — |
+| 1600-3000 | Slides under along its length; oil slick decal expands 0→90 m; 6 flotsam billboards spawn and bob (they sample the wave function) | Voss line if tension changed | bubbles, then quiet |
 | 3000 | Silhouette mesh removed; slick + flotsam + one thin smoke wisp persist | Battle log entry | — |
 | 3500 | Done | — | — |
 
@@ -113,9 +117,19 @@ Sequence for the enemy's turn (starts after TURN(ai)):
 | A+1100 | Impact: MISS beats (water column near the player fleet, 60 m off a hull) or HIT beats on the player's 3D ship segment (fireball, persistent smoke, list offset +3° per segment) | grid stamps result; fleet status updates | as MISS/HIT |
 | A+1600 | TURN(human): lock rings clear; "YOUR TURN" chip | — | — |
 
-Total time from the player's click to their next turn: 1.2 (FIRE) + 1.4 (HIT) +
-~1.0 (ANALYZING) + 1.6 (INCOMING) ≈ 5.2 s worst case with a SUNK overlap; the
-Director trims ANALYZING to keep ≤ 5.0 s. Fast toggle: ≈ 2.5 s.
+Total time from the player's click to their next turn (the blocking chain only):
+
+| Turn | Chain | Default | Fast |
+| --- | --- | --- | --- |
+| Miss | 1.2 FIRE + 1.0 MISS + 0.6-1.0 ANALYZING + 1.6 INCOMING | 4.4-4.8 s | 2.2-2.4 s |
+| Hit | 1.2 FIRE + 1.4 HIT + 0.6-1.0 ANALYZING + 1.6 INCOMING | 4.8-5.2 s → ANALYZING trimmed to 0.6 s, **5.0 s** | 2.5 s |
+| Hit + sunk | 1.2 FIRE + 0.6 HIT + 1.6 SUNK (blocking part) + 0 ANALYZING (skipped: the sinking *is* the beat) + 1.6 INCOMING | **5.0 s** | 2.5 s |
+| Final shot | 1.2 FIRE + 0.6 HIT + 3.5 SUNK (full, nothing follows) → debrief | 5.3 s, no turn budget applies | 2.65 s |
+
+The Director trims ANALYZING first, never the visible beats; a Vitest case plays a
+non-final sinking shot followed by the AI turn and asserts TURN(human) at ≤ 5.0 s.
+The SUNK tail (slide-under, slick) and persistent smoke are non-blocking and simply
+keep playing behind the next turn.
 
 ---
 

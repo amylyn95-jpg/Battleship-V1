@@ -15,9 +15,10 @@ Sections marked **(plain English)** are written for a non-engineer reader.
 ## 0. Read this first: what I found in the repo that changes the brief
 
 1. **The repo hosts two apps.** Besides Battleship, `devin-sales-academy/` is a
-   separate Next.js app published to the same GitHub Pages site under `/academy/`.
-   Nothing in this program touches it, but every session must keep its build
-   and its `/academy/` URL working. (The blueprint's lint/test commands run it too.)
+   separate Next.js app with its own `package.json`. It is **not** built or deployed
+   by `.github/workflows/deploy.yml` today (the workflow builds only the Vite root).
+   Nothing in this program touches it; each session only keeps its lint/tests
+   passing, because the blueprint's maintenance commands run them.
 2. **Pages base path.** The brief says the deploy runs with `GITHUB_PAGES=true`. It
    actually uses `PAGES_BASE=/Battleship-V1/` (see `.github/workflows/deploy.yml` and
    `vite.config.ts`). Same idea; I will keep the existing variable.
@@ -161,8 +162,12 @@ type GameEvent =
 ```
 
 One player shot emits `FIRE → (MISS | HIT [→ SUNK]) → TURN(ai)`; the enemy's reply
-emits `INCOMING → FIRE(ai) → (MISS | HIT [→ SUNK]) → TURN(human)`. Events are
-appended to the store; the Director consumes them in `seq` order.
+emits `INCOMING → FIRE(ai) → (MISS | HIT [→ SUNK]) → TURN(human)`. **Terminal
+branch:** if the shot sinks the last enemy (or friendly) ship, the sequence is
+`FIRE → HIT → SUNK → GAME_OVER` with no `TURN`; the store never emits any event after
+`GAME_OVER`. Events are appended to the store; the Director consumes them in `seq`
+order. Store tests cover both winning paths (human wins, AI wins) and assert that
+no `TURN` follows `GAME_OVER`.
 
 ---
 
@@ -265,8 +270,8 @@ h(x, z, t) = Σ_i  A_i · sin( dot(D_i, (x,z)) · k_i  +  t · ω_i  + φ_i )
 ### 5.2 How hulls float
 
 Each ship samples the wave height at **three points** (bow, stern, one beam point)
-every frame → position y = mean height; pitch = atan(bow - stern / length);
-roll = atan(beam - centre / half-beam). Angles are clamped (pitch ≤ 4°, roll ≤ 6°)
+every frame → position y = mean height; pitch = atan((bow - stern) / length);
+roll = atan((beam - centre) / half-beam). Angles are clamped (pitch ≤ 4°, roll ≤ 6°)
 and low-pass filtered so a 200 m carrier does not twitch on a ripple. The three
 samples are precomputed per ship length so the cost is ~12 sin() per ship per frame.
 
@@ -362,7 +367,10 @@ Drama comes from pacing, not information:
 finish with mean shots inside a band — Recruit 78-95, Tactical 52-66, Admiral 40-52
 (bands calibrated in S1 from 5000-game runs and then frozen); strict ordering
 Admiral < Tactical < Recruit; never a repeated shot; the existing regression cases
-for touching ships stay.
+for touching ships stay. Because `AiState.activeHits` does not record which ship a
+hit belongs to, the Admiral "two wounded ships" tuning gets its own seeded
+regression cases (two ships touching end-to-end, side-by-side, and L-shaped) that
+assert both ships are sunk without a repeated shot, before any tuning is merged.
 
 ---
 
@@ -405,7 +413,7 @@ against the new HUD but keeps the same scenario list.
 | 7 | GitHub Pages + 12 MB assets: slow first paint, no Brotli control | M | L | assets Draco/KTX2/ogg, lazy ship models, HDRI 1K for lighting; Pages already serves gzip | if TTFB is bad, move to Vercel (same static output, one workflow change) |
 | 8 | React migration breaks save-game compatibility | L | L | storage key bump to `v2` with a migration from v1 classic saves; v1 salvo saves are discarded with a friendly message | — |
 | 9 | Bundle grows past 900 KB gzip (three + drei + postprocessing) | M | L | import only used drei components; tree-shake postprocessing; CI size gate | lazy-load the Scene chunk after the command screen |
-| 10 | Breaking `/academy/` on the shared Pages site | L | M | do not touch `devin-sales-academy/`; keep its build in CI | revert the workflow step |
+| 10 | Breaking `devin-sales-academy/` lint/tests (run by the blueprint) | L | L | do not touch that folder; run its lint/tests before each PR | revert the offending change |
 
 ---
 
