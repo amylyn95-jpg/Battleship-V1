@@ -31,7 +31,7 @@ export interface SceneRig {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera: THREE.PerspectiveCamera;
   readonly ocean: THREE.Mesh;
-  readonly trailEnabled: boolean;
+  readonly trailCapable: boolean;
   render(force?: boolean): void;
   setTheatre(theatre: Theatre): void;
   setRig(rig: CameraRigId): void;
@@ -150,7 +150,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     renderer,
     camera,
     ocean,
-    trailEnabled: !softwareRenderer && !(window.matchMedia?.("(max-width: 700px)").matches ?? false),
+    trailCapable: !softwareRenderer,
     render(force = false): void {
       if (document.hidden) return;
       if (staticMode && renderedStatic && !force) return;
