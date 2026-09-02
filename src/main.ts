@@ -132,6 +132,7 @@ function resultKind(result: ShotResult): "hit" | "miss" | "sunk" {
 
 function restoredStatus(savedSession: Session | null): string {
   if (!savedSession) return "Choose your mission parameters.";
+  if (savedSession.phase === "placement") return "Fleet restored — finish deploying your ships.";
   if (savedSession.phase !== "playing") return "Game over.";
   if (savedSession.turn === "ai") return "Game restored — enemy is returning fire.";
   if (savedSession.mode !== "salvo" && savedSession.aiShots.length > 0) {
