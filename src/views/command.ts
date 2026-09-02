@@ -1,4 +1,5 @@
-import type { Difficulty, Mode } from "../types.js";
+import type { Difficulty, Mode, TheatreId } from "../types.js";
+import { THEATRES } from "../three/theatres.js";
 
 export interface CommandViewDom {
   root: HTMLElement;
@@ -7,6 +8,8 @@ export interface CommandViewDom {
   modeButtons: readonly HTMLButtonElement[];
   difficultyDescription: HTMLElement;
   modeDescription: HTMLElement;
+  theatreButtons: readonly HTMLButtonElement[];
+  theatreDescription: HTMLElement;
 }
 
 const difficultyDescriptions: Record<Difficulty, string> = {
@@ -25,6 +28,7 @@ export function renderCommand(
   visible: boolean,
   difficulty: Difficulty,
   mode: Mode,
+  theatre: TheatreId,
 ): void {
   dom.root.classList.toggle("hidden", !visible);
   for (const button of dom.difficultyButtons) {
@@ -37,4 +41,9 @@ export function renderCommand(
   }
   dom.difficultyDescription.textContent = difficultyDescriptions[difficulty];
   dom.modeDescription.textContent = modeDescriptions[mode];
+  for (const button of dom.theatreButtons) {
+    button.classList.toggle("selected", button.dataset.theatre === theatre);
+    button.setAttribute("aria-pressed", String(button.dataset.theatre === theatre));
+  }
+  dom.theatreDescription.textContent = THEATRES.find((item) => item.id === theatre)?.blurb ?? "";
 }

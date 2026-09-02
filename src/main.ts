@@ -6,7 +6,7 @@ import { ensureLayer, impact, intensityLevel, launchTorpedo, setIntensity, setRa
 import { currentHitStreak } from "./game.js";
 import { appendLog, aiFire, aiSalvo, clearSaved, fillTargets, load, newSession, nextShipToPlace, playerFire, playerSalvo, save, startBattle, toggleTarget } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
-import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
+import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult, TheatreId } from "./types.js";
 import { buildGrid, cellIndex, clearPreview, coordLabel, paintCoordinates, showPreview } from "./ui.js";
 import { isMuted, playFire, playHit, playLaunch, playLose, playMiss, playRadio, playSonar, playSunk, playWin, setMuted } from "./sound.js";
 import { renderCommand } from "./views/command.js";
@@ -14,10 +14,12 @@ import { renderDeploy, setupDeployDrag } from "./views/deploy.js";
 import { describe, describeSalvo, logText, renderBattle } from "./views/battle.js";
 import { renderDebrief } from "./views/debrief.js";
 import type { Session } from "./session.js";
+import type { Director } from "./three/director.js";
+import { defaultViewMode, prefersReducedMotion, readViewMode, webglSupported, writeViewMode, type ViewMode } from "./three/support.js";
+import type { Screen } from "./view-types.js";
 
 const AI_THINK_MS = 550;
 const TURN_SECONDS = 20;
-type Screen = "command" | "deploy" | "battle" | "debrief";
 
 function required<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -27,11 +29,14 @@ function required<T extends HTMLElement>(id: string): T {
 
 const dom = {
   command: required<HTMLElement>("command-screen"),
+  stage: required<HTMLElement>("stage"),
   topbarTitle: required<HTMLHeadingElement>("app-title"),
   difficultyButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")],
   modeButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-mode]")],
+  theatreButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-theatre]")],
   difficultyDescription: required<HTMLElement>("difficulty-description"),
   modeDescription: required<HTMLElement>("mode-description"),
+  theatreDescription: required<HTMLElement>("theatre-description"),
   deploy: required<HTMLElement>("deploy-screen"),
   battle: required<HTMLElement>("battle-screen"),
   boardArea: required<HTMLElement>("board-area"),
@@ -57,6 +62,7 @@ const dom = {
   mute: required<HTMLButtonElement>("mute"),
   muteIcon: required<HTMLSpanElement>("mute-icon"),
   muteLabel: required<HTMLSpanElement>("mute-label"),
+  viewToggle: required<HTMLButtonElement>("view-toggle"),
   salvoBar: required<HTMLElement>("salvo-bar"),
   salvoCount: required<HTMLSpanElement>("salvo-count"),
   salvoTimer: required<HTMLSpanElement>("salvo-timer"),
@@ -91,6 +97,9 @@ let aiTimer: number | null = null;
 let incomingTimer: number | null = null;
 let renderedScreen: Screen | null = null;
 let aimingCell: HTMLButtonElement | null = null;
+let director: Director | null = null;
+let viewMode: ViewMode = readViewMode() ?? defaultViewMode();
+let viewModeRequest = 0;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
@@ -139,6 +148,7 @@ function playerShotEffects(results: readonly ShotResult[]): void {
     sunk,
     streak: currentHitStreak(session.playerShots),
   });
+  director?.playerShot(results, salvo);
 }
 
 function enemyShotEffects(results: readonly ShotResult[]): void {
@@ -153,6 +163,7 @@ function enemyShotEffects(results: readonly ShotResult[]): void {
     hit: results.some((result) => result.hit),
     sunk,
   });
+  director?.enemyShot(results);
 }
 
 function playResults(results: readonly ShotResult[]): void {
@@ -197,18 +208,22 @@ function syncScreenToPhase(): void {
 }
 
 function render(): void {
+  document.body.dataset.screen = screen;
   renderCommand(
     {
       root: dom.command,
       mute: dom.mute,
       difficultyButtons: dom.difficultyButtons,
       modeButtons: dom.modeButtons,
+      theatreButtons: dom.theatreButtons,
       difficultyDescription: dom.difficultyDescription,
       modeDescription: dom.modeDescription,
+      theatreDescription: dom.theatreDescription,
     },
     screen === "command",
     session.difficulty,
     session.mode,
+    session.theatre,
   );
   renderDeploy(
     {
@@ -265,6 +280,7 @@ function render(): void {
   const enemySunk = session.aiBoard.ships.filter(isSunk).length;
   setIntensity(intensityLevel(playerSunk, enemySunk));
   setRadar(dom.aiWrap, screen === "battle" && session.phase === "playing" && session.turn === "human" && !aiThinking);
+  director?.syncBoards(session, screen, session.phase === "gameover");
   dom.topbarTitle.classList.toggle("hidden", screen === "command");
   dom.newGame.classList.toggle("hidden", screen === "command");
   dom.boardArea.classList.toggle("hidden", screen === "command");
@@ -290,6 +306,43 @@ function render(): void {
   );
   renderedScreen = screen;
   if (screen !== "command") save(session);
+}
+
+async function setViewMode(next: ViewMode): Promise<void> {
+  const request = ++viewModeRequest;
+  const usable = next === "3d" && webglSupported() && !prefersReducedMotion();
+  viewMode = usable ? "3d" : "classic";
+  writeViewMode(viewMode);
+  document.body.dataset.view = viewMode;
+  dom.viewToggle.textContent = viewMode === "3d" ? "CLASSIC VIEW" : "3D VIEW";
+  dom.viewToggle.setAttribute("aria-pressed", String(viewMode === "3d"));
+  if (director) {
+    director.dispose();
+    director = null;
+  }
+  if (viewMode === "3d") {
+    try {
+      const { createDirector } = await import("./three/director.js");
+      const nextDirector = createDirector(dom.stage, {
+        theatre: session.theatre,
+        onPick: handleFireClick,
+        onHover: updateAiming,
+      });
+      if (request !== viewModeRequest) {
+        nextDirector.dispose();
+        return;
+      }
+      director = nextDirector;
+    } catch {
+      if (request !== viewModeRequest) return;
+      viewMode = "classic";
+      writeViewMode(viewMode);
+      document.body.dataset.view = viewMode;
+      dom.viewToggle.textContent = "3D VIEW";
+      dom.viewToggle.setAttribute("aria-pressed", "false");
+    }
+  }
+  render();
 }
 
 function selectShip(id: ShipId): void {
@@ -342,6 +395,7 @@ function updateAiming(next: Coord | null): void {
     aiming = null;
   }
   dom.targetReadout.textContent = aiming === null ? "TARGET LOCK — —" : `TARGET LOCK — ${coordLabel(aiming)}`;
+  director?.aim(aiming);
 }
 
 function stopClock(): void {
@@ -442,11 +496,13 @@ function scheduleAiTurn(): void {
 }
 
 function resetGame(difficulty: Difficulty = session.difficulty, mode: Mode = session.mode, nextScreen: Screen = "deploy"): void {
+  const theatre = session.theatre;
   clearSaved();
   stopClock();
   if (aiTimer !== null) window.clearTimeout(aiTimer);
   if (incomingTimer !== null) window.clearTimeout(incomingTimer);
   session = newSession(difficulty, mode);
+  session.theatre = theatre;
   screen = nextScreen;
   aiThinking = false;
   incomingFire = false;
@@ -478,6 +534,16 @@ for (const button of dom.modeButtons) {
     render();
   });
 }
+for (const button of dom.theatreButtons) {
+  button.addEventListener("click", () => {
+    session.theatre = button.dataset.theatre as TheatreId;
+    director?.setTheatre(session.theatre);
+    render();
+  });
+}
+dom.viewToggle.addEventListener("click", () => {
+  void setViewMode(viewMode === "3d" ? "classic" : "3d");
+});
 dom.command.querySelector<HTMLButtonElement>("[data-action='deploy']")!.addEventListener("click", () => {
   screen = "deploy";
   setStatus("Place your fleet to begin.");
@@ -587,7 +653,13 @@ showMuteState();
 if (saved && session.phase === "playing") {
   dom.commsLine.textContent = vossLine({ kind: "resume" });
 }
-setStatus(saved ? (session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over.") : "Choose your mission parameters.");
-render();
+const restoredStatus = saved && session.phase === "playing" && session.aiShots.length > 0
+  ? describe(session.aiShots[session.aiShots.length - 1]!, "The enemy")
+  : saved
+    ? session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over."
+    : "Choose your mission parameters.";
+setStatus(restoredStatus);
+document.body.dataset.view = viewMode;
+void setViewMode(viewMode);
 if (session.phase === "playing" && session.turn === "ai") scheduleAiTurn();
 else startClock();

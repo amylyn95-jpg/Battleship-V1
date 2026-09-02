@@ -20,12 +20,14 @@ import type {
   Player,
   ShipSpec,
   ShotResult,
+  TheatreId,
 } from "./types.js";
 
 export interface Session {
   phase: Phase;
   difficulty: Difficulty;
   mode: Mode;
+  theatre: TheatreId;
   turn: Player;
   /** Salvo mode only: cells the human has picked but not yet fired. */
   pendingTargets: Coord[];
@@ -48,6 +50,7 @@ export function newSession(difficulty: Difficulty, mode: Mode = "classic"): Sess
     phase: "placement",
     difficulty,
     mode,
+    theatre: "trafalgar",
     turn: "human",
     pendingTargets: [],
     playerBoard: emptyBoard(),
@@ -252,6 +255,7 @@ export interface SerializedSession {
   difficulty: Difficulty;
   /** Absent in saves written before salvo mode existed. */
   mode?: Mode;
+  theatre?: TheatreId;
   pendingTargets?: Coord[];
   turn: Player;
   playerBoard: Board;
@@ -278,6 +282,7 @@ export function serialize(session: Session): string {
     phase: session.phase,
     difficulty: session.difficulty,
     mode: session.mode,
+    theatre: session.theatre,
     pendingTargets: session.pendingTargets,
     turn: session.turn,
     playerBoard: session.playerBoard,
@@ -307,6 +312,7 @@ export function deserialize(raw: string): Session {
     phase: data.phase,
     difficulty: data.difficulty,
     mode: data.mode ?? "classic",
+    theatre: data.theatre ?? "trafalgar",
     pendingTargets: data.pendingTargets ?? [],
     turn: data.turn,
     playerBoard: data.playerBoard,

@@ -90,6 +90,7 @@ describe("session flow", () => {
 describe("persistence", () => {
   it("round-trips a mid-game session including AI memory", () => {
     const session = readySession();
+    session.theatre = "midway";
     playerFire(session, { row: 3, col: 3 });
     aiFire(session);
 
@@ -100,6 +101,7 @@ describe("persistence", () => {
     expect(restored.playerBoard).toEqual(session.playerBoard);
     expect([...restored.ai.tried.entries()]).toEqual([...session.ai.tried.entries()]);
     expect(restored.ai.remainingShips).toEqual(session.ai.remainingShips);
+    expect(restored.theatre).toBe("midway");
   });
 
   it("round-trips battle statistics and log fields", () => {
@@ -120,11 +122,13 @@ describe("persistence", () => {
     delete data.startedAt;
     delete data.endedAt;
     delete data.log;
+    delete data.theatre;
     const restored = deserialize(JSON.stringify(data));
     expect(restored.turns).toBe(0);
     expect(restored.startedAt).toBeNull();
     expect(restored.endedAt).toBeNull();
     expect(restored.log).toEqual([]);
+    expect(restored.theatre).toBe("trafalgar");
   });
 
   it("resets statistics, timing and log for a new session", () => {
@@ -139,6 +143,7 @@ describe("persistence", () => {
     expect(fresh.endedAt).toBeNull();
     expect(fresh.log).toEqual([]);
     expect(fresh.mode).toBe("salvo");
+    expect(fresh.theatre).toBe("trafalgar");
   });
 
   it("saves, loads and clears through storage", () => {

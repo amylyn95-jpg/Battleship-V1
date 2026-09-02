@@ -35,12 +35,21 @@ async function engage(page: Page): Promise<void> {
 
 test("passes through the command screen", async ({ page }) => {
   await expect(page.locator("#command-screen")).toBeVisible();
+  await expect(page.locator("#stage canvas")).toHaveCount(0);
   await expect(page.locator("#app-title")).toBeHidden();
   await expect(page.locator("#new-game")).toBeHidden();
   await expect(page.locator("#footer-hint")).toBeHidden();
   await page.getByRole("button", { name: "ADMIRAL" }).click();
   await expect(page.locator("#difficulty-description")).toContainText("Probability targeting");
   await expect(page.locator("#mode-description")).toContainText("Classic engagement");
+  await page.getByRole("button", { name: /MIDWAY/ }).click();
+  await expect(page.locator("#theatre-description")).toContainText("Carrier range");
+  await page.getByRole("button", { name: "3D VIEW" }).click();
+  await expect(page.locator("#stage canvas")).toHaveCount(1);
+  await page.getByRole("button", { name: "CLASSIC VIEW" }).click();
+  await expect(page.locator("#stage canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "3D VIEW" }).click();
+  await expect(page.locator("#stage canvas")).toHaveCount(1);
   await page.getByRole("button", { name: "DEPLOY FLEET" }).click();
   await expect(page.locator("#app-title")).toBeVisible();
   await expect(page.locator("#new-game")).toBeVisible();
@@ -220,6 +229,9 @@ test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("plays through turns with cinematic animations suppressed", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.reload();
+    await expect(page.locator("#stage canvas")).toHaveCount(0);
     await engage(page);
     await expect(page.locator("#ai-wrap .fx-layer .radar")).toHaveCount(1);
     await page.locator("#ai-board .cell").nth(0).click();
