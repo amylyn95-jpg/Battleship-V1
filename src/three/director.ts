@@ -112,6 +112,9 @@ export function createDirector(
   };
   let markerSignature = "";
   let fleetSignature = "";
+  let sceneSignature = "";
+  let sceneScreen: Screen | null = null;
+  let sceneBoardKey = "";
   let currentAim: Coord | null = null;
   const projectiles: ImpactFlight[] = [];
   const impacts: FxVisual[] = [];
@@ -227,6 +230,7 @@ export function createDirector(
       theatre = theatreConfig(id);
       rig.setTheatre(theatre);
       fleetSignature = "";
+      rig.render(true);
     },
     syncBoards(session, screen, revealEnemy): void {
       const activeRig = screen === "command" || screen === "deploy" || screen === "debrief"
@@ -256,16 +260,32 @@ export function createDirector(
         renderFleet(session.aiBoard, "enemy", revealEnemy);
         fleetSignature = boardKey;
       }
+      const sceneKey = [
+        activeRig,
+        targetGrid.visible,
+        reticle.visible,
+        currentAim?.row ?? "",
+        currentAim?.col ?? "",
+        boardKey,
+      ].join(":");
+      if (sceneKey !== sceneSignature) {
+        rig.render(sceneScreen === null || sceneScreen !== screen || sceneBoardKey !== boardKey);
+        sceneSignature = sceneKey;
+        sceneScreen = screen;
+        sceneBoardKey = boardKey;
+      }
     },
     aim(coord): void {
       currentAim = coord;
       if (coord === null) {
         reticle.visible = false;
+        rig.render();
         return;
       }
       const point = gridToWorld(coord, "enemy");
       reticle.position.set(point.x, 0.8, point.z);
       reticle.visible = true;
+      rig.render();
     },
     playerShot(results, salvo): void {
       rig.setRig("player");
@@ -275,6 +295,7 @@ export function createDirector(
         launch(result.coord, "enemy", salvo || kind === "miss" ? "neutral" : kind);
         markers.add(marker(result.coord, "enemy", salvo ? "#9fb8c8" : result.hit ? "#e05d3a" : "#eaf6ff"));
       }
+      rig.render();
     },
     enemyShot(results): void {
       rig.setRig("own");
@@ -284,6 +305,7 @@ export function createDirector(
         launch(result.coord, "player", kind === "miss" ? "neutral" : kind);
         markers.add(marker(result.coord, "player", result.hit ? "#e05d3a" : "#eaf6ff"));
       }
+      rig.render();
     },
     setStatic(on): void {
       staticMode = on;

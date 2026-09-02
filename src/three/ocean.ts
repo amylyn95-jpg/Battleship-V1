@@ -99,10 +99,13 @@ const fragmentShader = `
 
 export const OCEAN_FRAGMENT_SHADER = fragmentShader;
 
-export function createOcean(theatre: Theatre, mobile: boolean): THREE.Mesh {
-  const segments = mobile ? 64 : 128;
+export function createOcean(theatre: Theatre, mobile: boolean, lowPower = false): THREE.Mesh {
+  const segments = lowPower ? 32 : mobile ? 64 : 128;
   const geometry = new THREE.PlaneGeometry(620, 620, segments, segments);
   geometry.rotateX(-Math.PI / 2);
+  if (lowPower) {
+    return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: theatre.sea }));
+  }
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },

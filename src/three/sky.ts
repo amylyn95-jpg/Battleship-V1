@@ -50,20 +50,22 @@ const skyFragmentShader = `
   }
 `;
 
-export function createSky(theatre: Theatre): THREE.Group {
+export function createSky(theatre: Theatre, lowPower = false): THREE.Group {
   const group = new THREE.Group();
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uTop: { value: new THREE.Color(theatre.skyTop) },
-      uHorizon: { value: new THREE.Color(theatre.sky) },
-      uSunDir: { value: new THREE.Vector3(...theatre.sun).normalize() },
-      uTime: { value: 0 },
-    },
-    vertexShader: skyVertexShader,
-    fragmentShader: skyFragmentShader,
-    side: THREE.BackSide,
-    depthWrite: false,
-  });
+  const material = lowPower
+    ? new THREE.MeshBasicMaterial({ color: theatre.sky, side: THREE.BackSide, depthWrite: false })
+    : new THREE.ShaderMaterial({
+      uniforms: {
+        uTop: { value: new THREE.Color(theatre.skyTop) },
+        uHorizon: { value: new THREE.Color(theatre.sky) },
+        uSunDir: { value: new THREE.Vector3(...theatre.sun).normalize() },
+        uTime: { value: 0 },
+      },
+      vertexShader: skyVertexShader,
+      fragmentShader: skyFragmentShader,
+      side: THREE.BackSide,
+      depthWrite: false,
+    });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(390, 32, 18), material);
   dome.name = "sky-dome";
   group.add(dome);

@@ -653,7 +653,12 @@ showMuteState();
 if (saved && session.phase === "playing") {
   dom.commsLine.textContent = vossLine({ kind: "resume" });
 }
-setStatus(saved ? (session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over.") : "Choose your mission parameters.");
+const restoredStatus = saved && session.phase === "playing" && session.aiShots.length > 0
+  ? describe(session.aiShots[session.aiShots.length - 1]!, "The enemy")
+  : saved
+    ? session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over."
+    : "Choose your mission parameters.";
+setStatus(restoredStatus);
 document.body.dataset.view = viewMode;
 void setViewMode(viewMode);
 if (session.phase === "playing" && session.turn === "ai") scheduleAiTurn();

@@ -31,6 +31,7 @@ export interface SceneRig {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera: THREE.PerspectiveCamera;
   readonly ocean: THREE.Mesh;
+  render(force?: boolean): void;
   setTheatre(theatre: Theatre): void;
   setRig(rig: CameraRigId): void;
   focusImpact(coord: Coord, side: BoardSide): void;
@@ -50,7 +51,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     ? String(context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL))
     : "";
   const softwareRenderer = /swiftshader|software renderer|llvmpipe/i.test(rendererName);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, softwareRenderer ? 0.75 : 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, softwareRenderer ? 0.25 : 1.5));
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute("aria-hidden", "true");
@@ -61,8 +62,9 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
   const ocean = createOcean(
     theatre,
     (window.matchMedia?.("(max-width: 700px)").matches ?? false) || softwareRenderer,
+    softwareRenderer,
   );
-  let sky = createSky(theatre);
+  let sky = createSky(theatre, softwareRenderer);
   const hemisphere = new THREE.HemisphereLight(theatre.sky, theatre.deep, 1.8);
   const sun = new THREE.DirectionalLight("#fff0cf", 2.3);
   sun.position.set(...theatre.sun).multiplyScalar(100);
@@ -70,7 +72,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
 
   let currentRig: CameraRigId = "overview";
   let impact: { position: THREE.Vector3; target: THREE.Vector3; until: number } | null = null;
-  let staticMode = false;
+  let staticMode = softwareRenderer;
   let renderedStatic = false;
   let rafId = 0;
   let last = performance.now();
@@ -99,8 +101,9 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     camera.position.lerp(desired.position, alpha);
     camera.lookAt(desired.target);
     if (!staticMode) {
-      const oceanMaterial = ocean.material as THREE.ShaderMaterial;
-      oceanMaterial.uniforms.uTime.value += delta;
+      if (ocean.material instanceof THREE.ShaderMaterial) {
+        ocean.material.uniforms.uTime.value += delta;
+      }
       const skyMaterial = sky.children.find((child) => child instanceof THREE.Mesh)?.material;
       if (skyMaterial instanceof THREE.ShaderMaterial) skyMaterial.uniforms.uTime.value += delta;
       for (const updater of updaters) updater(now, delta);
@@ -117,6 +120,10 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     if (!staticMode || !renderedStatic) {
       renderFrame(now, delta);
       renderedStatic = staticMode;
+    }
+    if (staticMode) {
+      rafId = 0;
+      return;
     }
     rafId = requestAnimationFrame(loop);
   };
@@ -143,22 +150,32 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     renderer,
     camera,
     ocean,
+    render(force = false): void {
+      if (document.hidden) return;
+      if (staticMode && renderedStatic && !force) return;
+      renderFrame(performance.now(), 0);
+      renderedStatic = staticMode;
+    },
     setTheatre(next): void {
       theatre = theatreConfig(next.id);
       scene.fog = new THREE.Fog(theatre.fog, 320, 620);
-      const uniforms = (ocean.material as THREE.ShaderMaterial).uniforms;
-      uniforms.uDeep.value.set(theatre.deep);
-      uniforms.uSea.value.set(theatre.sea);
-      uniforms.uHorizon.value.set(theatre.sky);
-      uniforms.uFogColor.value.set(theatre.fog);
-      uniforms.uSunDir.value.set(...theatre.sun).normalize();
-      uniforms.uChoppy.value = theatre.choppy;
+      if (ocean.material instanceof THREE.ShaderMaterial) {
+        const uniforms = ocean.material.uniforms;
+        uniforms.uDeep.value.set(theatre.deep);
+        uniforms.uSea.value.set(theatre.sea);
+        uniforms.uHorizon.value.set(theatre.sky);
+        uniforms.uFogColor.value.set(theatre.fog);
+        uniforms.uSunDir.value.set(...theatre.sun).normalize();
+        uniforms.uChoppy.value = theatre.choppy;
+      } else if (ocean.material instanceof THREE.MeshBasicMaterial) {
+        ocean.material.color.set(theatre.sea);
+      }
       hemisphere.color.set(theatre.sky);
       hemisphere.groundColor.set(theatre.deep);
       sun.position.set(...theatre.sun).multiplyScalar(100);
       disposeObject(sky);
       scene.remove(sky);
-      sky = createSky(theatre);
+      sky = createSky(theatre, softwareRenderer);
       scene.add(sky);
     },
     setRig(rig): void {
@@ -189,6 +206,10 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
       staticMode = on;
       renderedStatic = false;
       if (on && !document.hidden) renderFrame(performance.now(), 0);
+      if (!on && !rafId && !document.hidden) {
+        last = performance.now();
+        rafId = requestAnimationFrame(loop);
+      }
     },
     dispose(): void {
       resizeObserver.disconnect();
