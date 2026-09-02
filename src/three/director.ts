@@ -50,6 +50,13 @@ function resultKind(result: ShotResult): "hit" | "sunk" | "miss" {
   return result.hit ? "hit" : "miss";
 }
 
+const TARGET_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.38);
+
+export function pickTarget(ray: THREE.Ray): Coord | null {
+  const point = ray.intersectPlane(TARGET_PLANE, new THREE.Vector3());
+  return point ? worldToGrid(point.x, point.z, "enemy") : null;
+}
+
 function makeTargetGrid(): THREE.Group {
   const group = new THREE.Group();
   group.name = "enemy-target-grid";
@@ -105,6 +112,7 @@ export function createDirector(
   };
   let markerSignature = "";
   let fleetSignature = "";
+  let currentAim: Coord | null = null;
   const projectiles: ImpactFlight[] = [];
   const impacts: FxVisual[] = [];
 
@@ -152,8 +160,7 @@ export function createDirector(
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, rig.camera);
-    const hit = raycaster.intersectObject(rig.ocean)[0];
-    return hit ? worldToGrid(hit.point.x, hit.point.z, "enemy") : null;
+    return pickTarget(raycaster.ray);
   };
   rig.renderer.domElement.addEventListener("pointermove", (event) => opts.onHover(pick(event)));
   rig.renderer.domElement.addEventListener("pointerleave", () => opts.onHover(null));
@@ -227,7 +234,7 @@ export function createDirector(
         : session.turn === "ai" ? "own" : "player";
       rig.setRig(activeRig);
       targetGrid.visible = screen === "battle";
-      reticle.visible = screen === "battle" && session.turn === "human" && session.phase === "playing";
+      reticle.visible = currentAim !== null && screen === "battle" && session.turn === "human" && session.phase === "playing";
       const markerKey = `${session.playerShots.length}:${session.aiShots.length}:${session.mode}`;
       if (markerKey !== markerSignature) {
         clearMarkers();
@@ -251,7 +258,8 @@ export function createDirector(
       }
     },
     aim(coord): void {
-      if (!coord) {
+      currentAim = coord;
+      if (coord === null) {
         reticle.visible = false;
         return;
       }

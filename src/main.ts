@@ -99,6 +99,7 @@ let renderedScreen: Screen | null = null;
 let aimingCell: HTMLButtonElement | null = null;
 let director: Director | null = null;
 let viewMode: ViewMode = readViewMode() ?? defaultViewMode();
+let viewModeRequest = 0;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
@@ -308,6 +309,7 @@ function render(): void {
 }
 
 async function setViewMode(next: ViewMode): Promise<void> {
+  const request = ++viewModeRequest;
   const usable = next === "3d" && webglSupported() && !prefersReducedMotion();
   viewMode = usable ? "3d" : "classic";
   writeViewMode(viewMode);
@@ -321,12 +323,18 @@ async function setViewMode(next: ViewMode): Promise<void> {
   if (viewMode === "3d") {
     try {
       const { createDirector } = await import("./three/director.js");
-      director = createDirector(dom.stage, {
+      const nextDirector = createDirector(dom.stage, {
         theatre: session.theatre,
         onPick: handleFireClick,
         onHover: updateAiming,
       });
+      if (request !== viewModeRequest) {
+        nextDirector.dispose();
+        return;
+      }
+      director = nextDirector;
     } catch {
+      if (request !== viewModeRequest) return;
       viewMode = "classic";
       writeViewMode(viewMode);
       document.body.dataset.view = viewMode;

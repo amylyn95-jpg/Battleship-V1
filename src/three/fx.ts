@@ -7,6 +7,7 @@ export interface FxVisual {
   readonly startedAt: number;
   readonly duration: number;
   readonly persistent: boolean;
+  readonly fadeDuration: number;
 }
 
 function material(color: string, opacity = 1): THREE.MeshBasicMaterial {
@@ -38,7 +39,13 @@ export function createImpact(kind: ImpactVisualKind, position: THREE.Vector3, no
     group.add(fire);
   }
   group.position.copy(position);
-  return { group, startedAt: now, duration: kind === "sunk" ? 2500 : 1050, persistent: kind !== "neutral" };
+  return {
+    group,
+    startedAt: now,
+    duration: kind === "sunk" ? 2500 : 1050,
+    persistent: kind !== "neutral",
+    fadeDuration: kind === "neutral" ? 0 : 2200,
+  };
 }
 
 export function createDamageEffect(stage: 0 | 1 | 2 | 3, x: number): THREE.Group | null {
@@ -63,7 +70,8 @@ export function createDamageEffect(stage: 0 | 1 | 2 | 3, x: number): THREE.Group
 }
 
 export function updateFx(visual: FxVisual, now: number): boolean {
-  const t = Math.max(0, Math.min(1, (now - visual.startedAt) / visual.duration));
+  const age = now - visual.startedAt;
+  const t = Math.max(0, Math.min(1, age / visual.duration));
   visual.group.scale.setScalar(0.5 + t * 0.8);
   const plume = visual.group.getObjectByName("plume");
   if (plume) plume.scale.y = 0.25 + Math.min(1, t * 2.2);
@@ -71,7 +79,21 @@ export function updateFx(visual: FxVisual, now: number): boolean {
   if (spray) spray.scale.setScalar(0.6 + t * 1.1);
   const fire = visual.group.getObjectByName("fireball");
   if (fire) fire.scale.setScalar(1 + Math.sin(t * Math.PI) * 0.7);
-  return !visual.persistent && t >= 1;
+  if (visual.persistent && age >= visual.duration) {
+    const fade = Math.max(0, 1 - (age - visual.duration) / visual.fadeDuration);
+    visual.group.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        const baseOpacity = typeof material.userData.baseOpacity === "number"
+          ? material.userData.baseOpacity
+          : material.opacity;
+        material.userData.baseOpacity = baseOpacity;
+        material.opacity = baseOpacity * fade;
+      }
+    });
+  }
+  return age >= visual.duration + visual.fadeDuration;
 }
 
 export function updateDamageEffect(group: THREE.Group, now: number): void {
@@ -79,5 +101,9 @@ export function updateDamageEffect(group: THREE.Group, now: number): void {
   const fire = group.getObjectByName("fire");
   if (fire) fire.scale.setScalar(pulse);
   const smoke = group.getObjectByName("smoke");
-  if (smoke) smoke.position.y += 0.002;
+  if (smoke) {
+    const baseY = typeof smoke.userData.baseY === "number" ? smoke.userData.baseY : smoke.position.y;
+    smoke.userData.baseY = baseY;
+    smoke.position.y = baseY + Math.sin(now / 180) * 0.12;
+  }
 }

@@ -15,13 +15,23 @@ export function webglSupported(): boolean {
   }
 }
 
-export function readViewMode(storage: Storage | undefined = typeof localStorage === "undefined" ? undefined : localStorage): ViewMode | null {
-  const value = storage?.getItem(VIEW_KEY);
-  return value === "classic" || value === "3d" ? value : null;
+export function readViewMode(storage?: Storage): ViewMode | null {
+  try {
+    const source = storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
+    const value = source?.getItem(VIEW_KEY);
+    return value === "classic" || value === "3d" ? value : null;
+  } catch {
+    return null;
+  }
 }
 
-export function writeViewMode(mode: ViewMode, storage: Storage | undefined = typeof localStorage === "undefined" ? undefined : localStorage): void {
-  storage?.setItem(VIEW_KEY, mode);
+export function writeViewMode(mode: ViewMode, storage?: Storage): void {
+  try {
+    const source = storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
+    source?.setItem(VIEW_KEY, mode);
+  } catch {
+    // Storage can be unavailable in private or blocked browsing contexts.
+  }
 }
 
 export function defaultViewMode(): ViewMode {

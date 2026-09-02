@@ -44,7 +44,13 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(theatre.fog, 320, 620);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  const context = renderer.getContext();
+  const debugInfo = context.getExtension("WEBGL_debug_renderer_info");
+  const rendererName = debugInfo
+    ? String(context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL))
+    : "";
+  const softwareRenderer = /swiftshader|software renderer|llvmpipe/i.test(rendererName);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, softwareRenderer ? 0.75 : 1.5));
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute("aria-hidden", "true");
@@ -52,7 +58,10 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
   container.append(renderer.domElement);
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 800);
-  const ocean = createOcean(theatre, window.matchMedia?.("(max-width: 700px)").matches ?? false);
+  const ocean = createOcean(
+    theatre,
+    (window.matchMedia?.("(max-width: 700px)").matches ?? false) || softwareRenderer,
+  );
   let sky = createSky(theatre);
   const hemisphere = new THREE.HemisphereLight(theatre.sky, theatre.deep, 1.8);
   const sun = new THREE.DirectionalLight("#fff0cf", 2.3);
