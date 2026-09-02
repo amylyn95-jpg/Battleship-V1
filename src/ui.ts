@@ -37,6 +37,30 @@ export function buildGrid(container: HTMLElement, onSelect: (coord: Coord) => vo
   return cells;
 }
 
+export function paintCoordinates(wrap: HTMLElement): void {
+  if (wrap.querySelector(".board-frame")) return;
+  const board = wrap.querySelector<HTMLElement>(".board");
+  if (!board) return;
+  const frame = document.createElement("div");
+  frame.className = "board-frame";
+  const top = document.createElement("div");
+  top.className = "coordinate-labels coordinate-labels-top";
+  top.setAttribute("aria-hidden", "true");
+  const side = document.createElement("div");
+  side.className = "coordinate-labels coordinate-labels-side";
+  side.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < BOARD_SIZE; index++) {
+    const column = document.createElement("span");
+    column.textContent = String.fromCharCode(65 + index);
+    top.append(column);
+    const row = document.createElement("span");
+    row.textContent = String(index + 1);
+    side.append(row);
+  }
+  wrap.insertBefore(frame, board);
+  frame.append(top, side, board);
+}
+
 export function cellIndex(coord: Coord): number {
   return coord.row * BOARD_SIZE + coord.col;
 }
@@ -139,12 +163,42 @@ export function showTargets(
   for (const coord of coords) cells[cellIndex(coord)]?.classList.add("target");
 }
 
-export function paintFleet(list: HTMLElement, ships: readonly Ship[]): void {
+export function paintOwnFleet(list: HTMLElement, ships: readonly Ship[]): void {
   list.textContent = "";
   for (const ship of ships) {
     const item = document.createElement("li");
-    item.textContent = `${ship.name} (${ship.length})`;
+    const label = document.createElement("span");
+    label.textContent = ship.name;
+    const bar = document.createElement("span");
+    bar.className = "damage-bar";
+    bar.setAttribute("aria-label", `${ship.hits.length} of ${ship.length} damage`);
+    for (let index = 0; index < ship.length; index++) {
+      const pip = document.createElement("span");
+      pip.className = "damage-pip";
+      pip.classList.toggle("filled", ship.hits.length > index);
+      pip.setAttribute("aria-hidden", "true");
+      bar.append(pip);
+    }
+    const state = document.createElement("span");
+    state.className = "fleet-state";
+    state.textContent = isSunk(ship) ? "DESTROYED" : "";
     item.classList.toggle("sunk", isSunk(ship));
+    item.append(label, bar, state);
+    list.append(item);
+  }
+}
+
+export function paintEnemyFleet(list: HTMLElement, ships: readonly Ship[]): void {
+  list.textContent = "";
+  for (const ship of ships) {
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.textContent = ship.name;
+    const state = document.createElement("span");
+    state.className = "fleet-state";
+    state.textContent = isSunk(ship) ? "DESTROYED" : "ACTIVE";
+    item.classList.toggle("sunk", isSunk(ship));
+    item.append(label, state);
     list.append(item);
   }
 }
@@ -159,6 +213,7 @@ export function paintDock(dock: HTMLElement, board: Board, nextId: ShipId | null
   for (const spec of FLEET) {
     const item = document.createElement("li");
     item.dataset.ship = spec.id;
+    item.draggable = !placed.has(spec.id);
     item.classList.toggle("placed", placed.has(spec.id));
     item.classList.toggle("current", spec.id === nextId);
 

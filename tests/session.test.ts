@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendLog,
   aiFire,
   clearSaved,
   deserialize,
@@ -99,6 +100,45 @@ describe("persistence", () => {
     expect(restored.playerBoard).toEqual(session.playerBoard);
     expect([...restored.ai.tried.entries()]).toEqual([...session.ai.tried.entries()]);
     expect(restored.ai.remainingShips).toEqual(session.ai.remainingShips);
+  });
+
+  it("round-trips battle statistics and log fields", () => {
+    const session = readySession();
+    appendLog(session, "system", "Battle started.");
+    playerFire(session, { row: 3, col: 3 });
+    const restored = deserialize(serialize(session));
+    expect(restored.turns).toBe(session.turns);
+    expect(restored.startedAt).toBe(session.startedAt);
+    expect(restored.endedAt).toBe(session.endedAt);
+    expect(restored.log).toEqual(session.log);
+  });
+
+  it("defaults new fields when loading an old save", () => {
+    const session = readySession();
+    const data = JSON.parse(serialize(session)) as Record<string, unknown>;
+    delete data.turns;
+    delete data.startedAt;
+    delete data.endedAt;
+    delete data.log;
+    const restored = deserialize(JSON.stringify(data));
+    expect(restored.turns).toBe(0);
+    expect(restored.startedAt).toBeNull();
+    expect(restored.endedAt).toBeNull();
+    expect(restored.log).toEqual([]);
+  });
+
+  it("resets statistics, timing and log for a new session", () => {
+    const session = readySession();
+    session.turns = 4;
+    session.startedAt = 1;
+    session.endedAt = 2;
+    appendLog(session, "you", "A shot.");
+    const fresh = newSession("hard", "salvo");
+    expect(fresh.turns).toBe(0);
+    expect(fresh.startedAt).toBeNull();
+    expect(fresh.endedAt).toBeNull();
+    expect(fresh.log).toEqual([]);
+    expect(fresh.mode).toBe("salvo");
   });
 
   it("saves, loads and clears through storage", () => {

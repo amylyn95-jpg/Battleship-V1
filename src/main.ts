@@ -1,50 +1,23 @@
-import { canPlace, inBounds, placeShip, randomFleet, shipCells, emptyBoard, isFleetComplete } from "./board.js";
+import { canPlace, emptyBoard, inBounds, isFleetComplete, isSunk, placeShip, randomFleet, shipCells } from "./board.js";
+import { vossLine } from "./commander.js";
+import type { VossEvent } from "./commander.js";
 import { createAi } from "./ai.js";
-import { accuracy, shotsFired } from "./game.js";
-import {
-  aiFire,
-  aiSalvo,
-  clearSaved,
-  fillTargets,
-  load,
-  newSession,
-  nextShipToPlace,
-  playerFire,
-  playerSalvo,
-  playerSalvoSize,
-  save,
-  startBattle,
-  toggleTarget,
-} from "./session.js";
+import { ensureLayer, impact, intensityLevel, launchTorpedo, setIntensity, setRadar, shake, sonarPulse } from "./effects.js";
+import { currentHitStreak } from "./game.js";
+import { appendLog, aiFire, aiSalvo, clearSaved, fillTargets, load, newSession, nextShipToPlace, playerFire, playerSalvo, save, startBattle, toggleTarget } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
-import type { Coord, Difficulty, Mode, Orientation, Phase, ShotResult } from "./types.js";
-import {
-  buildGrid,
-  cellIndex,
-  clearPreview,
-  coordLabel,
-  paintBoard,
-  paintDock,
-  paintFleet,
-  showPreview,
-  showTargets,
-} from "./ui.js";
-import {
-  isMuted,
-  playFire,
-  playHit,
-  playLose,
-  playMiss,
-  playSunk,
-  playWin,
-  setMuted,
-} from "./sound.js";
+import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
+import { buildGrid, cellIndex, clearPreview, coordLabel, paintCoordinates, showPreview } from "./ui.js";
+import { isMuted, playFire, playHit, playLaunch, playLose, playMiss, playRadio, playSonar, playSunk, playWin, setMuted } from "./sound.js";
+import { renderCommand } from "./views/command.js";
+import { renderDeploy, setupDeployDrag } from "./views/deploy.js";
+import { describe, describeSalvo, logText, renderBattle } from "./views/battle.js";
+import { renderDebrief } from "./views/debrief.js";
 import type { Session } from "./session.js";
 
 const AI_THINK_MS = 550;
-/** Salvo mode shot clock. */
 const TURN_SECONDS = 20;
-const SHAKE_MS = 420;
+type Screen = "command" | "deploy" | "battle" | "debrief";
 
 function required<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -53,27 +26,37 @@ function required<T extends HTMLElement>(id: string): T {
 }
 
 const dom = {
+  command: required<HTMLElement>("command-screen"),
+  topbarTitle: required<HTMLHeadingElement>("app-title"),
+  difficultyButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")],
+  modeButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-mode]")],
+  difficultyDescription: required<HTMLElement>("difficulty-description"),
+  modeDescription: required<HTMLElement>("mode-description"),
+  deploy: required<HTMLElement>("deploy-screen"),
+  battle: required<HTMLElement>("battle-screen"),
+  boardArea: required<HTMLElement>("board-area"),
+  playerWrap: required<HTMLElement>("player-wrap"),
+  aiWrap: required<HTMLElement>("ai-wrap"),
   playerBoard: required<HTMLDivElement>("player-board"),
   aiBoard: required<HTMLDivElement>("ai-board"),
   playerFleet: required<HTMLUListElement>("player-fleet"),
   aiFleet: required<HTMLUListElement>("ai-fleet"),
   status: required<HTMLParagraphElement>("status"),
-  placementPanel: required<HTMLElement>("placement-panel"),
+  deployStatus: required<HTMLParagraphElement>("deploy-status"),
   placementPrompt: required<HTMLParagraphElement>("placement-prompt"),
   rotate: required<HTMLButtonElement>("rotate"),
   randomFleet: required<HTMLButtonElement>("random-fleet"),
   resetFleet: required<HTMLButtonElement>("reset-fleet"),
-  startBattle: required<HTMLButtonElement>("start-battle"),
+  engage: required<HTMLButtonElement>("engage-enemy"),
   startHint: required<HTMLParagraphElement>("start-hint"),
   dock: required<HTMLUListElement>("dock"),
+  steps: required<HTMLElement>("steps"),
   stepPlace: required<HTMLLIElement>("step-place"),
   stepStart: required<HTMLLIElement>("step-start"),
   stepFire: required<HTMLLIElement>("step-fire"),
   mute: required<HTMLButtonElement>("mute"),
   muteIcon: required<HTMLSpanElement>("mute-icon"),
   muteLabel: required<HTMLSpanElement>("mute-label"),
-  difficulty: required<HTMLSelectElement>("difficulty"),
-  mode: required<HTMLSelectElement>("mode"),
   salvoBar: required<HTMLElement>("salvo-bar"),
   salvoCount: required<HTMLSpanElement>("salvo-count"),
   salvoTimer: required<HTMLSpanElement>("salvo-timer"),
@@ -81,27 +64,44 @@ const dom = {
   newGame: required<HTMLButtonElement>("new-game"),
   gameover: required<HTMLDivElement>("gameover"),
   gameoverTitle: required<HTMLHeadingElement>("gameover-title"),
-  gameoverStats: required<HTMLParagraphElement>("gameover-stats"),
+  gameoverStats: required<HTMLDListElement>("gameover-stats"),
+  gameoverRating: required<HTMLElement>("gameover-rating"),
   rematch: required<HTMLButtonElement>("rematch"),
+  newBattle: required<HTMLButtonElement>("new-battle"),
+  changeDifficulty: required<HTMLButtonElement>("change-difficulty"),
+  turnBanner: required<HTMLElement>("turn-banner"),
+  targetReadout: required<HTMLElement>("target-readout"),
+  battleLog: required<HTMLUListElement>("battle-log"),
+  commsLine: required<HTMLElement>("comms-line"),
+  footerHint: required<HTMLElement>("footer-hint"),
 };
 
-let session: Session = load() ?? newSession("normal");
+const saved = load();
+let session: Session = saved ?? newSession("normal");
+let screen: Screen = saved ? (saved.phase === "placement" ? "deploy" : saved.phase === "playing" ? "battle" : "debrief") : "command";
 let orientation: Orientation = "horizontal";
+let selectedShipId: ShipId | null = nextShipToPlace(session)?.id ?? null;
 let cursor: Coord = { row: 0, col: 0 };
-/** True while the AI's delayed shot is pending, to lock out player input. */
+let aiming: Coord | null = null;
 let aiThinking = false;
-/** Salvo mode: id of the shot-clock interval, and when the clock runs out. */
+let incomingFire = false;
 let clockTimer: number | null = null;
 let clockEndsAt = 0;
+let aiTimer: number | null = null;
+let incomingTimer: number | null = null;
+let renderedScreen: Screen | null = null;
+let aimingCell: HTMLButtonElement | null = null;
 
 const playerCells = buildGrid(dom.playerBoard, handlePlacementClick);
 const aiCells = buildGrid(dom.aiBoard, handleFireClick);
-
-dom.difficulty.value = session.difficulty;
-dom.mode.value = session.mode;
+paintCoordinates(dom.playerWrap);
+paintCoordinates(dom.aiWrap);
+ensureLayer(dom.playerWrap);
+ensureLayer(dom.aiWrap);
 
 function setStatus(html: string): void {
-  dom.status.innerHTML = html;
+  const target = screen === "deploy" ? dom.deployStatus : dom.status;
+  target.innerHTML = html;
 }
 
 function showMuteState(): void {
@@ -111,155 +111,237 @@ function showMuteState(): void {
   dom.muteLabel.textContent = muted ? "Sound off" : "Sound on";
 }
 
-function shake(): void {
-  document.body.classList.add("shake");
-  window.setTimeout(() => document.body.classList.remove("shake"), SHAKE_MS);
+function announceVoss(event: VossEvent): void {
+  playRadio();
+  dom.commsLine.textContent = vossLine(event);
 }
 
-/** Plays the loudest thing that happened in a volley, and shakes on a sinking. */
+function resultKind(result: ShotResult): "hit" | "miss" | "sunk" {
+  if (result.sunk) return "sunk";
+  return result.hit ? "hit" : "miss";
+}
+
+function playerShotEffects(results: readonly ShotResult[]): void {
+  const salvo = session.mode === "salvo";
+  for (const result of results) {
+    playLaunch();
+    launchTorpedo(dom.aiWrap, "bottom", result.coord);
+    if (!salvo) {
+      playSonar();
+      sonarPulse(dom.aiWrap, result.coord);
+    }
+    impact(dom.aiWrap, result.coord, salvo ? "miss" : resultKind(result));
+  }
+  const sunk = results.find((result) => result.sunk)?.sunk?.name ?? null;
+  announceVoss({
+    kind: "player-shot",
+    hit: results.some((result) => result.hit),
+    sunk,
+    streak: currentHitStreak(session.playerShots),
+  });
+}
+
+function enemyShotEffects(results: readonly ShotResult[]): void {
+  for (const result of results) {
+    playLaunch();
+    launchTorpedo(dom.playerWrap, "top", result.coord);
+    impact(dom.playerWrap, result.coord, resultKind(result));
+  }
+  const sunk = results.find((result) => result.sunk)?.sunk?.name ?? null;
+  announceVoss({
+    kind: "enemy-shot",
+    hit: results.some((result) => result.hit),
+    sunk,
+  });
+}
+
 function playResults(results: readonly ShotResult[]): void {
   playFire();
-  if (results.some((r) => r.sunk)) {
+  if (results.some((result) => result.sunk)) {
     playSunk();
-    shake();
-  } else if (results.some((r) => r.hit)) {
-    playHit();
+    shake("heavy");
+  } else if (results.some((result) => result.hit)) {
+    const playerSunk = session.playerBoard.ships.filter(isSunk).length;
+    const enemySunk = session.aiBoard.ships.filter(isSunk).length;
+    playHit(intensityLevel(playerSunk, enemySunk));
   } else {
     playMiss();
   }
-  const destroyed = results.find((r) => r.fleetDestroyed);
-  if (destroyed) window.setTimeout(() => (session.winner === "human" ? playWin() : playLose()), 450);
-}
-
-/**
- * Salvo feedback is deliberately vague: only the number of hits, never which
- * shots landed. Sinkings are still announced because the board reveals them.
- */
-function describeSalvo(results: readonly ShotResult[], actor: "Your" | "Enemy"): string {
-  const hits = results.filter((r) => r.hit).length;
-  const sunk = results.filter((r) => r.sunk).map((r) => r.sunk!.name);
-  const tally =
-    hits === 0
-      ? `${actor} salvo of ${results.length}: all misses.`
-      : `${actor} salvo of ${results.length}: <span class="hit-text">${hits} hit${hits === 1 ? "" : "s"}</span>!`;
-  if (sunk.length === 0) return tally;
-  const owner = actor === "Your" ? "Sank the" : "They sank your";
-  return `${tally} <span class="sunk-text">${owner} ${sunk.join(" and ")}</span>!`;
-}
-
-function describe(result: ShotResult, actor: "You" | "The enemy"): string {
-  const where = coordLabel(result.coord);
-  if (result.sunk) {
-    const verb = actor === "You" ? "sank" : "sank your";
-    return `${actor} hit ${where} and <span class="sunk-text">${verb} ${result.sunk.name}</span>!`;
+  if (results.some((result) => result.fleetDestroyed)) {
+    window.setTimeout(() => (session.winner === "human" ? playWin() : playLose()), 450);
   }
-  if (result.hit) return `${actor} <span class="hit-text">hit</span> at ${where}.`;
-  return `${actor} missed at ${where}.`;
+}
+
+function appendResultsLog(results: readonly ShotResult[], actor: "you" | "enemy"): void {
+  appendLog(session, actor, logText(results, actor, session.mode === "salvo"));
+  if (session.mode !== "salvo") return;
+  for (const result of results) {
+    if (result.sunk) {
+      appendLog(session, actor, actor === "you" ? `You sank the ${result.sunk.name}.` : `The enemy sank your ${result.sunk.name}.`);
+    }
+  }
 }
 
 function currentPhase(): Phase {
   return session.phase;
 }
 
-function lastShotOf(shots: readonly ShotResult[]): Coord | null {
-  return shots.length > 0 ? shots[shots.length - 1]!.coord : null;
+function syncScreenToPhase(): void {
+  if (session.phase === "gameover") {
+    const enteringDebrief = screen !== "debrief";
+    screen = "debrief";
+    aiming = null;
+    setRadar(dom.aiWrap, false);
+    if (enteringDebrief) announceVoss({ kind: session.winner === "human" ? "victory" : "defeat" });
+  }
 }
 
 function render(): void {
-  const salvo = session.mode === "salvo";
-  paintBoard(playerCells, session.playerBoard, true, lastShotOf(session.aiShots));
-  // The enemy fleet is only revealed once the game is over. In salvo mode the
-  // outcome of each shot stays hidden until the ship it belongs to sinks.
-  paintBoard(
-    aiCells,
-    session.aiBoard,
-    session.phase === "gameover",
-    lastShotOf(session.playerShots),
-    salvo,
+  renderCommand(
+    {
+      root: dom.command,
+      mute: dom.mute,
+      difficultyButtons: dom.difficultyButtons,
+      modeButtons: dom.modeButtons,
+      difficultyDescription: dom.difficultyDescription,
+      modeDescription: dom.modeDescription,
+    },
+    screen === "command",
+    session.difficulty,
+    session.mode,
   );
-  if (salvo) showTargets(aiCells, session.pendingTargets);
-  paintFleet(dom.playerFleet, session.playerBoard.ships);
-  paintFleet(dom.aiFleet, session.aiBoard.ships);
-
-  const placing = session.phase === "placement";
-  dom.placementPanel.classList.toggle("hidden", !placing);
-  dom.aiBoard.classList.toggle("targetable", session.phase === "playing" && session.turn === "human");
-  const ready = isFleetComplete(session.playerBoard);
-  dom.startBattle.disabled = !ready;
-
-  // Step strip: highlight what the player has to do next, so "Start battle"
-  // never looks like a dead button with no explanation.
-  dom.stepPlace.classList.toggle("active", placing && !ready);
-  dom.stepPlace.classList.toggle("done", ready || !placing);
-  dom.stepStart.classList.toggle("active", placing && ready);
-  dom.stepStart.classList.toggle("done", !placing);
-  dom.stepFire.classList.toggle("active", !placing);
-
-  if (placing) {
-    const next = nextShipToPlace(session);
-    dom.placementPrompt.textContent = next
-      ? `Place your ${next.name} (${next.length} cells, ${orientation}) — click a square on your waters.`
-      : "Fleet ready. Start the battle!";
-    paintDock(dom.dock, session.playerBoard, next?.id ?? null);
-    const left = FLEET.length - session.playerBoard.ships.length;
-    dom.startHint.textContent = ready
-      ? ""
-      : `${left} ship${left === 1 ? "" : "s"} left to place — or use Random fleet.`;
-  }
-
-  const playerTurn = session.phase === "playing" && session.turn === "human" && !aiThinking;
-  for (const cell of aiCells) {
-    const fired = cell.classList.contains("fired");
-    cell.disabled = !playerTurn || fired;
-  }
-
-  dom.salvoBar.classList.toggle("hidden", !salvo || session.phase !== "playing");
-  if (salvo) {
-    const picked = session.pendingTargets.length;
-    dom.salvoCount.textContent = `Targets ${picked}/${playerSalvoSize(session)}`;
-    dom.fireSalvo.disabled = !playerTurn || picked === 0;
-    if (!playerTurn) dom.salvoTimer.textContent = "--";
-  }
-  for (const cell of playerCells) {
-    cell.disabled = session.phase !== "placement";
-  }
-
-  dom.gameover.classList.toggle("hidden", session.phase !== "gameover");
-  if (session.phase === "gameover") {
-    const playerWon = session.winner === "human";
-    dom.gameoverTitle.textContent = playerWon ? "Victory!" : "Defeat";
-    const shots = shotsFired(session.aiBoard);
-    const acc = Math.round(accuracy(session.aiBoard) * 100);
-    dom.gameoverStats.textContent = playerWon
-      ? `You won in ${shots} shots (${acc}% accuracy).`
-      : `The enemy sank your fleet in ${shotsFired(session.playerBoard)} shots. You fired ${shots} (${acc}% accuracy).`;
-    dom.rematch.focus();
-  }
-
-  save(session);
+  renderDeploy(
+    {
+      root: dom.deploy,
+      playerBoard: dom.playerBoard,
+      playerFleet: dom.playerFleet,
+      placementPrompt: dom.placementPrompt,
+      rotate: dom.rotate,
+      randomFleet: dom.randomFleet,
+      resetFleet: dom.resetFleet,
+      engage: dom.engage,
+      startHint: dom.startHint,
+      dock: dom.dock,
+      stepPlace: dom.stepPlace,
+      stepStart: dom.stepStart,
+      stepFire: dom.stepFire,
+    },
+    {
+      board: session.playerBoard,
+      cells: playerCells,
+      orientation,
+      selectedShipId,
+      preview: previewPlacement,
+      clearPreview: () => clearPreview(playerCells),
+    },
+    screen === "deploy",
+  );
+  renderBattle(
+    {
+      root: dom.battle,
+      playerBoard: dom.playerBoard,
+      aiBoard: dom.aiBoard,
+      playerFleet: dom.playerFleet,
+      aiFleet: dom.aiFleet,
+      status: dom.status,
+      turnBanner: dom.turnBanner,
+      targetReadout: dom.targetReadout,
+      battleLog: dom.battleLog,
+      salvoBar: dom.salvoBar,
+      salvoCount: dom.salvoCount,
+      salvoTimer: dom.salvoTimer,
+      fireSalvo: dom.fireSalvo,
+      stepFire: dom.stepFire,
+    },
+    session,
+    playerCells,
+    aiCells,
+    aiThinking,
+    aiming,
+    screen === "battle" || screen === "debrief",
+    incomingFire,
+  );
+  const playerSunk = session.playerBoard.ships.filter(isSunk).length;
+  const enemySunk = session.aiBoard.ships.filter(isSunk).length;
+  setIntensity(intensityLevel(playerSunk, enemySunk));
+  setRadar(dom.aiWrap, screen === "battle" && session.phase === "playing" && session.turn === "human" && !aiThinking);
+  dom.topbarTitle.classList.toggle("hidden", screen === "command");
+  dom.newGame.classList.toggle("hidden", screen === "command");
+  dom.boardArea.classList.toggle("hidden", screen === "command");
+  dom.playerWrap.classList.toggle("hidden", screen === "command");
+  dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy");
+  dom.steps.classList.toggle("hidden", screen === "command");
+  dom.status.classList.toggle("hidden", screen === "command");
+  dom.footerHint.classList.toggle("hidden", screen !== "battle");
+  const enteringDebrief = screen === "debrief" && renderedScreen !== "debrief";
+  renderDebrief(
+    {
+      root: dom.gameover,
+      title: dom.gameoverTitle,
+      stats: dom.gameoverStats,
+      rating: dom.gameoverRating,
+      rematch: dom.rematch,
+      newBattle: dom.newBattle,
+      changeDifficulty: dom.changeDifficulty,
+    },
+    session,
+    screen === "debrief",
+    enteringDebrief,
+  );
+  renderedScreen = screen;
+  if (screen !== "command") save(session);
 }
 
-function handlePlacementClick(coord: Coord): void {
+function selectShip(id: ShipId): void {
+  if (session.playerBoard.ships.some((ship) => ship.id === id)) return;
+  selectedShipId = id;
+  render();
+}
+
+function placementSpec(id: ShipId | null = selectedShipId) {
+  return FLEET.find((spec) => spec.id === (id ?? nextShipToPlace(session)?.id));
+}
+
+function placeSelected(coord: Coord, id: ShipId | null = selectedShipId): void {
   if (session.phase !== "placement") return;
-  const spec = nextShipToPlace(session);
+  const spec = placementSpec(id);
   if (!spec) return;
   if (!canPlace(session.playerBoard, spec, coord, orientation)) {
     setStatus(`The ${spec.name} does not fit there.`);
     return;
   }
   session.playerBoard = placeShip(session.playerBoard, spec, coord, orientation);
-  const next = nextShipToPlace(session);
-  setStatus(next ? `${spec.name} placed. Next: ${next.name}.` : "Fleet ready — start the battle.");
+  selectedShipId = nextShipToPlace(session)?.id ?? null;
+  setStatus("");
   clearPreview(playerCells);
   render();
 }
 
-function previewAt(coord: Coord): void {
+function handlePlacementClick(coord: Coord): void {
+  placeSelected(coord);
+}
+
+function previewPlacement(coord: Coord, id: ShipId | null = selectedShipId): void {
   if (session.phase !== "placement") return;
-  const spec = nextShipToPlace(session);
+  const spec = placementSpec(id);
   if (!spec) return;
   const cells = shipCells(coord, spec.length, orientation).filter(inBounds);
   showPreview(playerCells, cells, canPlace(session.playerBoard, spec, coord, orientation));
+}
+
+function updateAiming(next: Coord | null): void {
+  const playerTurn = session.phase === "playing" && session.turn === "human" && !aiThinking;
+  const target = playerTurn && next ? aiCells[cellIndex(next)] : null;
+  if (aimingCell && aimingCell !== target) aimingCell.classList.remove("aiming");
+  if (target && !target.classList.contains("fired")) {
+    target.classList.add("aiming");
+    aimingCell = target;
+    aiming = next;
+  } else {
+    aimingCell = null;
+    aiming = null;
+  }
+  dom.targetReadout.textContent = aiming === null ? "TARGET LOCK — —" : `TARGET LOCK — ${coordLabel(aiming)}`;
 }
 
 function stopClock(): void {
@@ -273,12 +355,10 @@ function tickClock(): void {
   dom.salvoTimer.classList.toggle("urgent", left <= 5);
   if (left > 0) return;
   stopClock();
-  // Out of time: the rest of the salvo is fired blind.
   fillTargets(session);
   fireSalvo(true);
 }
 
-/** Starts the shot clock for the human's salvo turn. */
 function startClock(): void {
   stopClock();
   if (session.mode !== "salvo" || session.phase !== "playing" || session.turn !== "human") return;
@@ -288,156 +368,169 @@ function startClock(): void {
 }
 
 function fireSalvo(timedOut = false): void {
-  if (session.phase !== "playing" || session.turn !== "human" || aiThinking) return;
-  if (session.pendingTargets.length === 0) return;
+  if (session.phase !== "playing" || session.turn !== "human" || aiThinking || session.pendingTargets.length === 0) return;
   stopClock();
-
   const results = playerSalvo(session);
+  appendResultsLog(results, "you");
   playResults(results);
-  const prefix = timedOut ? "Time! " : "";
-  setStatus(prefix + describeSalvo(results, "Your"));
+  playerShotEffects(results);
+  setStatus(`${timedOut ? "Time! " : ""}${describeSalvo(results, "Your")}`);
+  aiming = null;
+  syncScreenToPhase();
   render();
-
-  if (currentPhase() === "gameover") return;
-  scheduleAiTurn();
+  if (currentPhase() !== "gameover") scheduleAiTurn();
 }
 
 function handleFireClick(coord: Coord): void {
   if (session.phase !== "playing" || session.turn !== "human" || aiThinking) return;
-
   if (session.mode === "salvo") {
     toggleTarget(session, coord);
     render();
     return;
   }
-
   let result: ShotResult;
   try {
     result = playerFire(session, coord);
   } catch {
     return;
   }
+  appendResultsLog([result], "you");
   playResults([result]);
+  playerShotEffects([result]);
   setStatus(describe(result, "You"));
+  aiming = null;
+  syncScreenToPhase();
   render();
-
-  if (currentPhase() === "gameover") return;
-  scheduleAiTurn();
+  if (currentPhase() !== "gameover") scheduleAiTurn();
 }
 
 function scheduleAiTurn(): void {
   aiThinking = true;
+  incomingFire = false;
   render();
-  window.setTimeout(() => {
+  incomingTimer = window.setTimeout(() => {
+    incomingFire = true;
+    render();
+  }, Math.floor(AI_THINK_MS * 0.65));
+  aiTimer = window.setTimeout(() => {
     aiThinking = false;
-    // Read through a helper so a stale narrowing from before the timeout does
-    // not convince the compiler the phase cannot have changed.
+    incomingFire = false;
     if (currentPhase() !== "playing" || session.turn !== "ai") {
       render();
       return;
     }
     if (session.mode === "salvo") {
       const volley = aiSalvo(session);
+      appendResultsLog(volley, "enemy");
       playResults(volley);
+      enemyShotEffects(volley);
       setStatus(describeSalvo(volley, "Enemy"));
+      syncScreenToPhase();
       render();
       startClock();
       return;
     }
     const result = aiFire(session);
+    appendResultsLog([result], "enemy");
     playResults([result]);
+    enemyShotEffects([result]);
     setStatus(describe(result, "The enemy"));
+    syncScreenToPhase();
     render();
+    startClock();
   }, AI_THINK_MS);
 }
 
-function resetGame(
-  difficulty: Difficulty = session.difficulty,
-  mode: Mode = session.mode,
-): void {
+function resetGame(difficulty: Difficulty = session.difficulty, mode: Mode = session.mode, nextScreen: Screen = "deploy"): void {
   clearSaved();
   stopClock();
+  if (aiTimer !== null) window.clearTimeout(aiTimer);
+  if (incomingTimer !== null) window.clearTimeout(incomingTimer);
   session = newSession(difficulty, mode);
+  screen = nextScreen;
   aiThinking = false;
+  incomingFire = false;
   orientation = "horizontal";
+  selectedShipId = nextShipToPlace(session)?.id ?? null;
+  aiming = null;
+  aimingCell = null;
   setStatus("Place your fleet to begin.");
   render();
 }
 
-dom.rotate.addEventListener("click", () => {
-  orientation = orientation === "horizontal" ? "vertical" : "horizontal";
-  previewAt(cursor);
-  render();
+setupDeployDrag(dom.dock, playerCells, {
+  select: selectShip,
+  preview: (id, coord) => previewPlacement(coord, id),
+  drop: (id, coord) => placeSelected(coord, id),
+  clear: () => clearPreview(playerCells),
 });
 
+for (const button of dom.difficultyButtons) {
+  button.addEventListener("click", () => {
+    session.difficulty = button.dataset.difficulty as Difficulty;
+    session.ai = createAi(session.difficulty);
+    render();
+  });
+}
+for (const button of dom.modeButtons) {
+  button.addEventListener("click", () => {
+    session.mode = button.dataset.mode as Mode;
+    render();
+  });
+}
+dom.command.querySelector<HTMLButtonElement>("[data-action='deploy']")!.addEventListener("click", () => {
+  screen = "deploy";
+  setStatus("Place your fleet to begin.");
+  render();
+});
+dom.rotate.addEventListener("click", () => {
+  orientation = orientation === "horizontal" ? "vertical" : "horizontal";
+  previewPlacement(cursor);
+  render();
+});
 dom.randomFleet.addEventListener("click", () => {
   if (session.phase !== "placement") return;
   session.playerBoard = randomFleet();
-  setStatus("Fleet placed at random — start the battle.");
+  selectedShipId = null;
+  setStatus("");
   render();
 });
-
 dom.resetFleet.addEventListener("click", () => {
   if (session.phase !== "placement") return;
   session.playerBoard = emptyBoard();
-  setStatus("Fleet cleared.");
+  selectedShipId = nextShipToPlace(session)?.id ?? null;
+  setStatus("");
   render();
 });
-
-dom.startBattle.addEventListener("click", () => {
+dom.engage.addEventListener("click", () => {
   if (session.phase !== "placement" || !isFleetComplete(session.playerBoard)) return;
   startBattle(session);
-  setStatus(
-    session.mode === "salvo"
-      ? "Battle stations — pick one target per surviving ship, then fire."
-      : "Battle stations — fire at the enemy waters.",
-  );
+  appendLog(session, "system", "Battle started.");
+  announceVoss({ kind: "battle-start", difficulty: session.difficulty });
+  screen = "battle";
+  setStatus(session.mode === "salvo" ? "Battle stations — pick one target per surviving ship, then fire." : "Battle stations — fire at the enemy waters.");
   render();
   startClock();
 });
-
 dom.fireSalvo.addEventListener("click", () => fireSalvo());
-
 dom.mute.addEventListener("click", () => {
   setMuted(!isMuted());
   showMuteState();
 });
-
-dom.mode.addEventListener("change", () => {
-  const mode = dom.mode.value as Mode;
-  if (session.phase === "placement") {
-    session.mode = mode;
-    setStatus(
-      mode === "salvo"
-        ? "Salvo mode: one shot per surviving ship each turn, on a 20 second clock."
-        : "Classic mode: one shot per turn.",
-    );
-    render();
-  } else {
-    resetGame(session.difficulty, mode);
-  }
-});
-
-dom.newGame.addEventListener("click", () =>
-  resetGame(dom.difficulty.value as Difficulty, dom.mode.value as Mode),
-);
-dom.rematch.addEventListener("click", () => resetGame());
-
-dom.difficulty.addEventListener("change", () => {
-  const difficulty = dom.difficulty.value as Difficulty;
-  if (session.phase === "placement") {
-    session.difficulty = difficulty;
-    session.ai = createAi(difficulty);
-    setStatus(`Difficulty set to ${difficulty}.`);
-    render();
-  } else {
-    resetGame(difficulty);
-  }
+dom.newGame.addEventListener("click", () => resetGame(session.difficulty, session.mode, "command"));
+dom.rematch.addEventListener("click", () => resetGame(session.difficulty, session.mode));
+dom.newBattle.addEventListener("click", () => resetGame(session.difficulty, session.mode, "command"));
+dom.changeDifficulty.addEventListener("click", () => {
+  resetGame(session.difficulty, session.mode, "command");
+  window.setTimeout(() => dom.difficultyButtons[0]?.focus(), 0);
 });
 
 for (const [cells, onEnter] of [
-  [playerCells, (c: Coord) => previewAt(c)],
-  [aiCells, () => clearPreview(playerCells)],
+  [playerCells, (coord: Coord) => previewPlacement(coord)],
+  [aiCells, (coord: Coord) => {
+    updateAiming(coord);
+    clearPreview(playerCells);
+  }],
 ] as const) {
   cells.forEach((cell, index) => {
     const coord: Coord = { row: Math.floor(index / BOARD_SIZE), col: index % BOARD_SIZE };
@@ -449,13 +542,21 @@ for (const [cells, onEnter] of [
       cursor = coord;
       onEnter(coord);
     });
+    cell.addEventListener("mouseleave", () => {
+      if (cells === aiCells) {
+        updateAiming(null);
+      }
+    });
+    cell.addEventListener("blur", () => {
+      if (cells === aiCells) {
+        updateAiming(null);
+      }
+    });
   });
 }
-
 dom.playerBoard.addEventListener("mouseleave", () => clearPreview(playerCells));
-
 document.addEventListener("keydown", (event) => {
-  if (event.key.toLowerCase() === "r" && session.phase === "placement") {
+  if (event.key.toLowerCase() === "r" && screen === "deploy") {
     dom.rotate.click();
     return;
   }
@@ -478,25 +579,15 @@ document.addEventListener("keydown", (event) => {
     row: Math.min(BOARD_SIZE - 1, Math.max(0, cursor.row + delta.row)),
     col: Math.min(BOARD_SIZE - 1, Math.max(0, cursor.col + delta.col)),
   };
-  const board = active.closest("#player-board") ? playerCells : aiCells;
-  board[cellIndex(next)]!.focus();
+  const cells = active.closest("#player-board") ? playerCells : aiCells;
+  cells[cellIndex(next)]!.focus();
 });
 
 showMuteState();
-setStatus(
-  session.phase === "placement"
-    ? "Place your fleet to begin."
-    : session.phase === "playing"
-      ? "Game restored — fire at the enemy waters."
-      : "Game over.",
-);
-render();
-
-// A game saved while the AI's shot was still pending would otherwise reload
-// with the board locked and nothing left to trigger the AI's turn.
-if (session.phase === "playing" && session.turn === "ai") {
-  scheduleAiTurn();
-} else {
-  // The shot clock is not persisted; a reload hands back a full turn.
-  startClock();
+if (saved && session.phase === "playing") {
+  dom.commsLine.textContent = vossLine({ kind: "resume" });
 }
+setStatus(saved ? (session.phase === "playing" ? "Game restored — fire at the enemy waters." : "Game over.") : "Choose your mission parameters.");
+render();
+if (session.phase === "playing" && session.turn === "ai") scheduleAiTurn();
+else startClock();
