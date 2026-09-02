@@ -41,6 +41,7 @@ Expectations:
 - After game over: exactly 17 occupied enemy cells (5+4+3+3+2) and concealment lifted.
 
 ## Theatres
+Only on branches carrying the theatre work — not yet on `main`.
 `#theatre` (aria-label "Battle theatre") switches between `pacific`, `sail`, `atlantic` and
 `mekong`; the active one is mirrored on `body[data-theatre]` and saved under the
 `battleship.theatre` localStorage key (an unknown value falls back to `pacific`). A theatre
@@ -64,8 +65,9 @@ The 20s clock is intentionally not persisted — a refresh mid-turn gives a fres
   sub-400px layout can't be verified here — say so rather than claiming phone coverage.
   Maximize with `wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz`.
 - To reach **defeat** quickly, pick Hard and keep firing at cells you know are empty.
-- The AI's reply is delayed (`AI_THINK_MS` in `src/main.ts`) and preceded by a few flickering
-  candidate cells on your own board; clicks are ignored while it is thinking, by design.
+- The AI's reply is delayed (`AI_THINK_MS` in `src/main.ts`) and clicks are ignored while it is
+  thinking, by design. On branches that carry the human-like AI work, the delay also flickers a
+  few candidate cells on your own board before it fires; on `main` there is no flicker.
 - Known cosmetic issue to re-check: the game-over card's overlay dims both boards, making the
   newly revealed enemy fleet hard to read on screen even though the DOM reveal is correct.
 
@@ -79,6 +81,6 @@ The 20s clock is intentionally not persisted — a refresh mid-turn gives a fres
 ## Regression-prone area
 The AI's wounded-ship tracking in `src/ai.ts` has already produced a real bug (hits on two
 adjacent ships merged into one imagined ship, emptying the target queue). It is invisible in a
-normal playthrough — watch *where* it fires after a hit. `nextShot`/`registerOutcome` are pure
+normal playthrough — watch *where* it fires after a hit. `nextShot`/`recordResult` are pure
 and take an injectable `random`, so replay suspect sequences in a vitest file instead of the UI.
 See `BUGS.md`.
