@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { waveHeight } from "../src/three/ocean.js";
+import { GERSTNER_WAVES, OCEAN_VERTEX_SHADER, waveHeight } from "../src/three/ocean.js";
 
 describe("3D ocean waves", () => {
+  it("uses one four-wave table for the shared surface model", () => {
+    expect(GERSTNER_WAVES).toHaveLength(4);
+    for (const wave of GERSTNER_WAVES) {
+      expect(wave.direction).toHaveLength(2);
+      expect(wave.wavelength).toBeGreaterThan(0);
+      expect(wave.amplitude).toBeGreaterThan(0);
+      expect(wave.speed).toBeGreaterThan(0);
+    }
+    expect(OCEAN_VERTEX_SHADER).toContain("uniform vec4 uWaves[4]");
+    expect(OCEAN_VERTEX_SHADER).toContain("uWaveSpeeds[i]");
+  });
+
   it("is deterministic and frozen at t=0", () => {
     expect(waveHeight(12, -8, 0, 0.8)).toBe(waveHeight(12, -8, 0, 0.8));
     expect(waveHeight(12, -8, 0, 0.8)).not.toBe(waveHeight(12, -8, 1, 0.8));

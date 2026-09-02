@@ -10,7 +10,6 @@ import { createAi, nextShot, recordResult } from "./ai.js";
 import { fire, salvoSize } from "./game.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
 import type { AiState } from "./ai.js";
-import type { TheatreId } from "./three/theatres.js";
 import type {
   Board,
   Coord,
@@ -21,6 +20,7 @@ import type {
   Player,
   ShipSpec,
   ShotResult,
+  TheatreId,
 } from "./types.js";
 
 export interface Session {

@@ -1,9 +1,20 @@
 import * as THREE from "three";
+import type { Coord, TheatreId } from "../types.js";
+import { gridToWorld, type BoardSide } from "./grid.js";
 import { createOcean } from "./ocean.js";
 import { createSky } from "./sky.js";
 import { theatreConfig, type Theatre } from "./theatres.js";
 
-function disposeObject(root: THREE.Object3D): void {
+export const CAMERA_RIGS = {
+  overview: { position: [0, 26, 118], target: [0, 4, 0] },
+  player: { position: [0, 20, 70], target: [0, 6, -60] },
+  own: { position: [0, 16, 100], target: [0, 4, 40] },
+} as const satisfies Record<string, { position: readonly [number, number, number]; target: readonly [number, number, number] }>;
+
+export type CameraRigId = keyof typeof CAMERA_RIGS;
+export type FrameUpdater = (now: number, delta: number) => void;
+
+export function disposeObject(root: THREE.Object3D): void {
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     object.geometry.dispose();
@@ -18,98 +29,163 @@ function disposeObject(root: THREE.Object3D): void {
 export interface SceneRig {
   readonly scene: THREE.Scene;
   readonly renderer: THREE.WebGLRenderer;
-  readonly overview: THREE.PerspectiveCamera;
-  readonly player: THREE.PerspectiveCamera;
-  readonly own: THREE.PerspectiveCamera;
+  readonly camera: THREE.PerspectiveCamera;
   readonly ocean: THREE.Mesh;
   setTheatre(theatre: Theatre): void;
+  setRig(rig: CameraRigId): void;
+  focusImpact(coord: Coord, side: BoardSide): void;
+  addFrameUpdater(updater: FrameUpdater): () => void;
   setStatic(on: boolean): void;
   dispose(): void;
 }
 
-export function createScene(container: HTMLElement, theatreId: Theatre["id"]): SceneRig {
-  const theatre = theatreConfig(theatreId);
+export function createScene(container: HTMLElement, theatreId: TheatreId): SceneRig {
+  let theatre = theatreConfig(theatreId);
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(theatre.fog, 60, 270);
+  scene.fog = new THREE.Fog(theatre.fog, 80, 360);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute("aria-hidden", "true");
   renderer.domElement.className = "three-canvas";
   container.append(renderer.domElement);
 
-  const overview = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
-  overview.position.set(0, 110, 145);
-  overview.lookAt(0, 0, 0);
-  const player = overview.clone();
-  player.position.set(0, 70, 128);
-  player.lookAt(0, 0, -30);
-  const own = overview.clone();
-  own.position.set(0, 42, 105);
-  own.lookAt(0, 2, 48);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 800);
   const ocean = createOcean(theatre, window.matchMedia?.("(max-width: 700px)").matches ?? false);
   let sky = createSky(theatre);
-  scene.add(ocean, sky);
-  scene.add(new THREE.HemisphereLight(theatre.sky, theatre.deep, 1.8));
+  const hemisphere = new THREE.HemisphereLight(theatre.sky, theatre.deep, 1.8);
   const sun = new THREE.DirectionalLight("#fff0cf", 2.3);
   sun.position.set(...theatre.sun).multiplyScalar(100);
-  scene.add(sun);
+  scene.add(ocean, sky, hemisphere, sun);
 
+  let currentRig: CameraRigId = "overview";
+  let impact: { position: THREE.Vector3; target: THREE.Vector3; until: number } | null = null;
   let staticMode = false;
   let renderedStatic = false;
   let rafId = 0;
   let last = performance.now();
+  const updaters = new Set<FrameUpdater>();
+  const rigPosition = new THREE.Vector3();
+  const rigTarget = new THREE.Vector3();
+
   const resize = (): void => {
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
     renderer.setSize(width, height);
-    for (const camera of [overview, player, own]) {
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  };
+  const desiredCamera = (now: number): { position: THREE.Vector3; target: THREE.Vector3 } => {
+    if (impact && now < impact.until) return impact;
+    impact = null;
+    const rig = CAMERA_RIGS[currentRig];
+    rigPosition.fromArray(rig.position);
+    rigTarget.fromArray(rig.target);
+    return { position: rigPosition, target: rigTarget };
+  };
+  const renderFrame = (now: number, delta: number): void => {
+    const desired = desiredCamera(now);
+    const alpha = staticMode ? 1 : 1 - Math.exp(-3.5 * delta);
+    camera.position.lerp(desired.position, alpha);
+    camera.lookAt(desired.target);
+    if (!staticMode) {
+      const oceanMaterial = ocean.material as THREE.ShaderMaterial;
+      oceanMaterial.uniforms.uTime.value += delta;
+      const skyMaterial = sky.children.find((child) => child instanceof THREE.Mesh)?.material;
+      if (skyMaterial instanceof THREE.ShaderMaterial) skyMaterial.uniforms.uTime.value += delta;
+      for (const updater of updaters) updater(now, delta);
     }
+    renderer.render(scene, camera);
   };
   const loop = (now: number): void => {
+    if (document.hidden) {
+      rafId = 0;
+      return;
+    }
     const delta = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (!staticMode) {
-      (ocean.material as THREE.ShaderMaterial).uniforms.uTime.value += delta;
-      renderer.render(scene, overview);
-    } else if (!renderedStatic) {
-      renderer.render(scene, overview);
-      renderedStatic = true;
+    if (!staticMode || !renderedStatic) {
+      renderFrame(now, delta);
+      renderedStatic = staticMode;
     }
     rafId = requestAnimationFrame(loop);
   };
+  const visibility = (): void => {
+    if (document.hidden) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+      return;
+    }
+    last = performance.now();
+    renderedStatic = false;
+    if (!rafId) rafId = requestAnimationFrame(loop);
+  };
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container);
+  document.addEventListener("visibilitychange", visibility);
   resize();
+  camera.position.fromArray(CAMERA_RIGS.overview.position);
+  camera.lookAt(new THREE.Vector3(...CAMERA_RIGS.overview.target));
   rafId = requestAnimationFrame(loop);
 
   return {
     scene,
     renderer,
-    overview,
-    player,
-    own,
+    camera,
     ocean,
     setTheatre(next): void {
-      const nextConfig = theatreConfig(next.id);
-      scene.fog = new THREE.Fog(nextConfig.fog, 60, 270);
-      (ocean.material as THREE.ShaderMaterial).uniforms.uSeaColor.value.set(nextConfig.sea);
-      (ocean.material as THREE.ShaderMaterial).uniforms.uSkyColor.value.set(nextConfig.deep);
-      (ocean.material as THREE.ShaderMaterial).uniforms.uChoppy.value = nextConfig.choppy;
+      theatre = theatreConfig(next.id);
+      scene.fog = new THREE.Fog(theatre.fog, 80, 360);
+      const uniforms = (ocean.material as THREE.ShaderMaterial).uniforms;
+      uniforms.uDeep.value.set(theatre.deep);
+      uniforms.uSea.value.set(theatre.sea);
+      uniforms.uHorizon.value.set(theatre.sky);
+      uniforms.uFogColor.value.set(theatre.fog);
+      uniforms.uSunDir.value.set(...theatre.sun).normalize();
+      uniforms.uChoppy.value = theatre.choppy;
+      hemisphere.color.set(theatre.sky);
+      hemisphere.groundColor.set(theatre.deep);
+      sun.position.set(...theatre.sun).multiplyScalar(100);
       disposeObject(sky);
       scene.remove(sky);
-      sky = createSky(nextConfig);
+      sky = createSky(theatre);
       scene.add(sky);
+    },
+    setRig(rig): void {
+      currentRig = rig;
+      if (staticMode) {
+        const next = CAMERA_RIGS[rig];
+        camera.position.fromArray(next.position);
+        camera.lookAt(new THREE.Vector3(...next.target));
+      }
+    },
+    focusImpact(coord, side): void {
+      const point = gridToWorld(coord, side);
+      impact = {
+        position: new THREE.Vector3(point.x, 22, point.z + 46),
+        target: new THREE.Vector3(point.x, 0, point.z),
+        until: performance.now() + 1200,
+      };
+      if (staticMode) {
+        camera.position.copy(impact.position);
+        camera.lookAt(impact.target);
+      }
+    },
+    addFrameUpdater(updater): () => void {
+      updaters.add(updater);
+      return () => updaters.delete(updater);
     },
     setStatic(on): void {
       staticMode = on;
+      renderedStatic = false;
+      if (on && !document.hidden) renderFrame(performance.now(), 0);
     },
     dispose(): void {
       resizeObserver.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
       cancelAnimationFrame(rafId);
+      updaters.clear();
       renderer.dispose();
       disposeObject(scene);
       renderer.domElement.remove();

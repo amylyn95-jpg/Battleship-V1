@@ -1,5 +1,5 @@
-import type { Difficulty, Mode } from "../types.js";
-import { THEATRES, type TheatreId } from "../three/theatres.js";
+import type { Difficulty, Mode, TheatreId } from "../types.js";
+import { THEATRES } from "../three/theatres.js";
 
 export interface CommandViewDom {
   root: HTMLElement;

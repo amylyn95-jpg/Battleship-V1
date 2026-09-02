@@ -41,6 +41,8 @@ export interface Board {
 
 export type Difficulty = "easy" | "normal" | "hard";
 
+export type TheatreId = "salamis" | "trafalgar" | "midway";
+
 /**
  * "classic" fires one shot per turn and marks each hit on the board.
  * "salvo" fires one shot per surviving ship and only reports how many of them

@@ -6,7 +6,7 @@ import { ensureLayer, impact, intensityLevel, launchTorpedo, setIntensity, setRa
 import { currentHitStreak } from "./game.js";
 import { appendLog, aiFire, aiSalvo, clearSaved, fillTargets, load, newSession, nextShipToPlace, playerFire, playerSalvo, save, startBattle, toggleTarget } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
-import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
+import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult, TheatreId } from "./types.js";
 import { buildGrid, cellIndex, clearPreview, coordLabel, paintCoordinates, showPreview } from "./ui.js";
 import { isMuted, playFire, playHit, playLaunch, playLose, playMiss, playRadio, playSonar, playSunk, playWin, setMuted } from "./sound.js";
 import { renderCommand } from "./views/command.js";
@@ -16,7 +16,6 @@ import { renderDebrief } from "./views/debrief.js";
 import type { Session } from "./session.js";
 import type { Director } from "./three/director.js";
 import { defaultViewMode, prefersReducedMotion, readViewMode, webglSupported, writeViewMode, type ViewMode } from "./three/support.js";
-import type { TheatreId } from "./three/theatres.js";
 import type { Screen } from "./view-types.js";
 
 const AI_THINK_MS = 550;

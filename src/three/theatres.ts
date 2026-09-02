@@ -1,4 +1,4 @@
-export type TheatreId = "salamis" | "trafalgar" | "midway";
+import type { TheatreId } from "../types.js";
 export type TheatreEra = "oar" | "sail" | "steel";
 export type ProjectileKind = "bolt" | "cannonball" | "bomb";
 
