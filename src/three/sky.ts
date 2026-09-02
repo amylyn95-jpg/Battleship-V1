@@ -37,14 +37,15 @@ const skyFragmentShader = `
   }
 
   void main() {
-    float skyMix = smoothstep(-0.16, 0.7, vDirection.y);
+    float skyMix = smoothstep(-0.04, 0.2, vDirection.y);
     vec3 color = mix(uHorizon, uTop, skyMix);
     float sun = max(dot(normalize(vDirection), normalize(uSunDir)), 0.0);
-    color += vec3(1.0, 0.52, 0.2) * pow(sun, 180.0) * 1.8;
-    color += vec3(1.0, 0.5, 0.25) * pow(sun, 12.0) * 0.16;
-    float cloudBand = smoothstep(-0.02, 0.38, vDirection.y) * (1.0 - smoothstep(0.38, 0.72, vDirection.y));
-    float clouds = smoothstep(0.48, 0.78, fbm(vDirection.xz * 5.0 + vec2(uTime * 0.008, 0.0)));
-    color = mix(color, color + vec3(0.23, 0.2, 0.17), clouds * cloudBand * 0.42);
+    color += vec3(1.0, 0.72, 0.34) * pow(sun, 320.0) * 2.6;
+    color += vec3(1.0, 0.6, 0.3) * pow(sun, 9.0) * 0.28;
+    float cloudBand = smoothstep(0.005, 0.06, vDirection.y) * (1.0 - smoothstep(0.25, 0.75, vDirection.y));
+    vec2 cloudPlane = vDirection.xz / max(vDirection.y, 0.02);
+    float clouds = smoothstep(0.34, 0.72, fbm(cloudPlane * 0.06 + vec2(uTime * 0.004, 0.0)));
+    color = mix(color, mix(color, vec3(1.0, 0.88, 0.78), 0.55), clouds * cloudBand * 0.7);
     gl_FragColor = vec4(color, 1.0);
   }
 `;
@@ -53,7 +54,7 @@ export function createSky(theatre: Theatre): THREE.Group {
   const group = new THREE.Group();
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      uTop: { value: new THREE.Color(theatre.deep) },
+      uTop: { value: new THREE.Color(theatre.skyTop) },
       uHorizon: { value: new THREE.Color(theatre.sky) },
       uSunDir: { value: new THREE.Vector3(...theatre.sun).normalize() },
       uTime: { value: 0 },

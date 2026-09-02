@@ -19,13 +19,22 @@ export function createImpact(kind: ImpactVisualKind, position: THREE.Vector3, no
   const foam = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.0, 24), material("#d8f4ef", 0.8));
   foam.rotation.x = -Math.PI / 2;
   group.add(foam);
-  const plume = new THREE.Mesh(new THREE.ConeGeometry(kind === "sunk" ? 2.3 : 1.25, kind === "sunk" ? 9 : 6, 12), material("#f4f8f2", 0.72));
-  plume.position.y = kind === "sunk" ? 4.5 : 3;
+  const plumeHeight = kind === "sunk" ? 26 : 17;
+  const plume = new THREE.Mesh(
+    new THREE.CylinderGeometry(kind === "sunk" ? 2.4 : 1.5, kind === "sunk" ? 3.4 : 2.2, plumeHeight, 14, 1, true),
+    material("#f4f8f2", 0.66),
+  );
+  plume.name = "plume";
+  plume.position.y = plumeHeight / 2;
   group.add(plume);
+  const spray = new THREE.Mesh(new THREE.SphereGeometry(kind === "sunk" ? 3.4 : 2.4, 12, 9), material("#ffffff", 0.52));
+  spray.name = "spray";
+  spray.position.y = plumeHeight;
+  group.add(spray);
   if (kind !== "neutral") {
-    const fire = new THREE.Mesh(new THREE.SphereGeometry(kind === "sunk" ? 2.8 : 1.8, 14, 10), material("#f06a2d", 0.92));
+    const fire = new THREE.Mesh(new THREE.SphereGeometry(kind === "sunk" ? 4.4 : 2.8, 14, 10), material("#f06a2d", 0.92));
     fire.name = "fireball";
-    fire.position.y = 2.2;
+    fire.position.y = 3.2;
     group.add(fire);
   }
   group.position.copy(position);
@@ -55,7 +64,11 @@ export function createDamageEffect(stage: 0 | 1 | 2 | 3, x: number): THREE.Group
 
 export function updateFx(visual: FxVisual, now: number): boolean {
   const t = Math.max(0, Math.min(1, (now - visual.startedAt) / visual.duration));
-  visual.group.scale.setScalar(0.35 + t * 1.5);
+  visual.group.scale.setScalar(0.5 + t * 0.8);
+  const plume = visual.group.getObjectByName("plume");
+  if (plume) plume.scale.y = 0.25 + Math.min(1, t * 2.2);
+  const spray = visual.group.getObjectByName("spray");
+  if (spray) spray.scale.setScalar(0.6 + t * 1.1);
   const fire = visual.group.getObjectByName("fireball");
   if (fire) fire.scale.setScalar(1 + Math.sin(t * Math.PI) * 0.7);
   return !visual.persistent && t >= 1;

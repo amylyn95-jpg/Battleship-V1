@@ -6,9 +6,9 @@ import { createSky } from "./sky.js";
 import { theatreConfig, type Theatre } from "./theatres.js";
 
 export const CAMERA_RIGS = {
-  overview: { position: [0, 26, 118], target: [0, 4, 0] },
-  player: { position: [0, 20, 70], target: [0, 6, -60] },
-  own: { position: [0, 16, 100], target: [0, 4, 40] },
+  overview: { position: [0, 34, 190], target: [0, 4, -30] },
+  player: { position: [0, 26, 150], target: [0, 4, -66] },
+  own: { position: [0, 24, 172], target: [0, 4, 30] },
 } as const satisfies Record<string, { position: readonly [number, number, number]; target: readonly [number, number, number] }>;
 
 export type CameraRigId = keyof typeof CAMERA_RIGS;
@@ -42,7 +42,7 @@ export interface SceneRig {
 export function createScene(container: HTMLElement, theatreId: TheatreId): SceneRig {
   let theatre = theatreConfig(theatreId);
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(theatre.fog, 80, 360);
+  scene.fog = new THREE.Fog(theatre.fog, 320, 620);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
@@ -136,7 +136,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     ocean,
     setTheatre(next): void {
       theatre = theatreConfig(next.id);
-      scene.fog = new THREE.Fog(theatre.fog, 80, 360);
+      scene.fog = new THREE.Fog(theatre.fog, 320, 620);
       const uniforms = (ocean.material as THREE.ShaderMaterial).uniforms;
       uniforms.uDeep.value.set(theatre.deep);
       uniforms.uSea.value.set(theatre.sea);
@@ -163,8 +163,8 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     focusImpact(coord, side): void {
       const point = gridToWorld(coord, side);
       impact = {
-        position: new THREE.Vector3(point.x, 22, point.z + 46),
-        target: new THREE.Vector3(point.x, 0, point.z),
+        position: new THREE.Vector3(point.x * 0.45, 44, point.z + 104),
+        target: new THREE.Vector3(point.x, 2, point.z),
         until: performance.now() + 1200,
       };
       if (staticMode) {

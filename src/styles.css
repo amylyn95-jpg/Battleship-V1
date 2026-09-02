@@ -842,8 +842,11 @@ body[data-view="3d"] .board-wrap h2 {
   font-size: 0.7rem;
 }
 
-body[data-view="3d"] .board {
+body[data-view="3d"] .board-wrap {
   --cell: clamp(16px, 3.1vw, 28px);
+}
+
+body[data-view="3d"] .board {
   gap: 1px;
 }
 
@@ -876,9 +879,6 @@ body[data-view="3d"] .board {
 
   body[data-view="3d"] .board-wrap {
     padding: 0.25rem;
-  }
-
-  body[data-view="3d"] .board {
     --cell: clamp(12px, 4.5vw, 22px);
   }
 
