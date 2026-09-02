@@ -71,6 +71,8 @@ The unit tests check the game rules, session saving, statistics, audio/effect
 helpers, and opponent decisions. The browser tests open the real game and check
 the screens and interactions, including reloads and reduced-motion play.
 
+The command title uses IM Fell English by Igino Marini, licensed under the SIL Open Font License, Version 1.1.
+
 ## Project layout
 
 | Location | Purpose |

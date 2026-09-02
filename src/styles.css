@@ -17,6 +17,14 @@
   --cell: clamp(24px, 7.5vw, 38px);
 }
 
+@font-face {
+  font-family: "IM Fell English";
+  src: url("./fonts/im-fell-english-italic.woff2") format("woff2");
+  font-display: swap;
+  font-style: italic;
+  font-weight: 400;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -51,9 +59,15 @@ body {
 
 h1 {
   margin: 0;
-  font-size: clamp(1.4rem, 5vw, 2rem);
-  letter-spacing: 0.12em;
+  font-size: clamp(1.55rem, 5.5vw, 2.2rem);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.topbar h1,
+.command-screen h2 {
+  font-family: "IM Fell English", Georgia, serif;
+  font-style: italic;
 }
 
 h2 {
@@ -627,8 +641,8 @@ footer {
 }
 
 .command-screen h2 {
-  font-size: clamp(2.5rem, 10vw, 5rem);
-  letter-spacing: 0.16em;
+  font-size: clamp(2.75rem, 11vw, 5.5rem);
+  letter-spacing: 0.08em;
   margin: 0;
 }
 
@@ -1294,8 +1308,9 @@ body.shake-heavy {
 .choice-description {
   min-height: 1.2em;
   margin: 0;
-  color: var(--miss);
-  font-size: 0.78rem;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .command-screen .choice-row button {
