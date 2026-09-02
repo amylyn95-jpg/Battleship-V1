@@ -865,6 +865,11 @@ body[data-view="3d"] .board {
   gap: 1px;
 }
 
+body[data-view="3d"] .coordinate-labels-top,
+body[data-view="3d"] .coordinate-labels-side {
+  gap: 1px;
+}
+
 .theatre-row button {
   display: grid;
   gap: 0.2rem;
@@ -898,7 +903,7 @@ body[data-view="3d"] .board {
     flex: 0 1 calc(50% - 0.175rem);
     min-width: 0;
     padding: 0.25rem;
-    --cell: clamp(12px, 3.4vw, 19px);
+    --cell: min(19px, max(9px, calc(5vw - 6px)));
   }
 
   .theatre-row button {
