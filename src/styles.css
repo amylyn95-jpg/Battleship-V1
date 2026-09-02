@@ -903,7 +903,7 @@ body[data-view="3d"] .coordinate-labels-side {
     flex: 0 1 calc(50% - 0.175rem);
     min-width: 0;
     padding: 0.25rem;
-    --cell: min(19px, max(9px, calc(5vw - 6px)));
+    --cell: min(19px, calc(5vw - 6px));
   }
 
   .theatre-row button {
