@@ -15,6 +15,22 @@ export function webglSupported(): boolean {
   }
 }
 
+export function softwareRenderer(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    if (!context) return false;
+    const debugInfo = context.getExtension("WEBGL_debug_renderer_info");
+    const renderer = debugInfo
+      ? String(context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL))
+      : "";
+    return /swiftshader|software renderer|llvmpipe/i.test(renderer);
+  } catch {
+    return false;
+  }
+}
+
 export function readViewMode(storage?: Storage): ViewMode | null {
   try {
     const source = storage ?? (typeof localStorage === "undefined" ? undefined : localStorage);
@@ -35,5 +51,5 @@ export function writeViewMode(mode: ViewMode, storage?: Storage): void {
 }
 
 export function defaultViewMode(): ViewMode {
-  return !prefersReducedMotion() && webglSupported() ? "3d" : "classic";
+  return !prefersReducedMotion() && webglSupported() && !softwareRenderer() ? "3d" : "classic";
 }

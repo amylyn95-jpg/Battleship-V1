@@ -875,11 +875,15 @@ body[data-view="3d"] .board {
   body[data-view="3d"] .boards {
     inset: auto 0.35rem 2.8rem;
     gap: 0.35rem;
+    flex-wrap: nowrap;
+    align-items: flex-end;
   }
 
   body[data-view="3d"] .board-wrap {
+    flex: 0 1 calc(50% - 0.175rem);
+    min-width: 0;
     padding: 0.25rem;
-    --cell: clamp(12px, 4.5vw, 22px);
+    --cell: clamp(10px, 3vw, 16px);
   }
 
   .theatre-row button {

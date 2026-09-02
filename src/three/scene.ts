@@ -64,7 +64,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     (window.matchMedia?.("(max-width: 700px)").matches ?? false) || softwareRenderer,
     softwareRenderer,
   );
-  let sky = createSky(theatre, softwareRenderer);
+  let sky = createSky(theatre);
   const hemisphere = new THREE.HemisphereLight(theatre.sky, theatre.deep, 1.8);
   const sun = new THREE.DirectionalLight("#fff0cf", 2.3);
   sun.position.set(...theatre.sun).multiplyScalar(100);
@@ -72,7 +72,7 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
 
   let currentRig: CameraRigId = "overview";
   let impact: { position: THREE.Vector3; target: THREE.Vector3; until: number } | null = null;
-  let staticMode = softwareRenderer;
+  let staticMode = false;
   let renderedStatic = false;
   let rafId = 0;
   let last = performance.now();
@@ -101,9 +101,8 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     camera.position.lerp(desired.position, alpha);
     camera.lookAt(desired.target);
     if (!staticMode) {
-      if (ocean.material instanceof THREE.ShaderMaterial) {
-        ocean.material.uniforms.uTime.value += delta;
-      }
+      const oceanMaterial = ocean.material as THREE.ShaderMaterial;
+      oceanMaterial.uniforms.uTime.value += delta;
       const skyMaterial = sky.children.find((child) => child instanceof THREE.Mesh)?.material;
       if (skyMaterial instanceof THREE.ShaderMaterial) skyMaterial.uniforms.uTime.value += delta;
       for (const updater of updaters) updater(now, delta);
@@ -159,23 +158,19 @@ export function createScene(container: HTMLElement, theatreId: TheatreId): Scene
     setTheatre(next): void {
       theatre = theatreConfig(next.id);
       scene.fog = new THREE.Fog(theatre.fog, 320, 620);
-      if (ocean.material instanceof THREE.ShaderMaterial) {
-        const uniforms = ocean.material.uniforms;
-        uniforms.uDeep.value.set(theatre.deep);
-        uniforms.uSea.value.set(theatre.sea);
-        uniforms.uHorizon.value.set(theatre.sky);
-        uniforms.uFogColor.value.set(theatre.fog);
-        uniforms.uSunDir.value.set(...theatre.sun).normalize();
-        uniforms.uChoppy.value = theatre.choppy;
-      } else if (ocean.material instanceof THREE.MeshBasicMaterial) {
-        ocean.material.color.set(theatre.sea);
-      }
+      const uniforms = (ocean.material as THREE.ShaderMaterial).uniforms;
+      uniforms.uDeep.value.set(theatre.deep);
+      uniforms.uSea.value.set(theatre.sea);
+      uniforms.uHorizon.value.set(theatre.sky);
+      uniforms.uFogColor.value.set(theatre.fog);
+      uniforms.uSunDir.value.set(...theatre.sun).normalize();
+      uniforms.uChoppy.value = theatre.choppy;
       hemisphere.color.set(theatre.sky);
       hemisphere.groundColor.set(theatre.deep);
       sun.position.set(...theatre.sun).multiplyScalar(100);
       disposeObject(sky);
       scene.remove(sky);
-      sky = createSky(theatre, softwareRenderer);
+      sky = createSky(theatre);
       scene.add(sky);
     },
     setRig(rig): void {

@@ -35,7 +35,7 @@ async function engage(page: Page): Promise<void> {
 
 test("passes through the command screen", async ({ page }) => {
   await expect(page.locator("#command-screen")).toBeVisible();
-  await expect(page.locator("#stage canvas")).toHaveCount(1);
+  await expect(page.locator("#stage canvas")).toHaveCount(0);
   await expect(page.locator("#app-title")).toBeHidden();
   await expect(page.locator("#new-game")).toBeHidden();
   await expect(page.locator("#footer-hint")).toBeHidden();
@@ -44,6 +44,8 @@ test("passes through the command screen", async ({ page }) => {
   await expect(page.locator("#mode-description")).toContainText("Classic engagement");
   await page.getByRole("button", { name: /MIDWAY/ }).click();
   await expect(page.locator("#theatre-description")).toContainText("Carrier range");
+  await page.getByRole("button", { name: "3D VIEW" }).click();
+  await expect(page.locator("#stage canvas")).toHaveCount(1);
   await page.getByRole("button", { name: "CLASSIC VIEW" }).click();
   await expect(page.locator("#stage canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "3D VIEW" }).click();
