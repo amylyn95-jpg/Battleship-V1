@@ -12,10 +12,12 @@
     <header class="topbar">
       <h1 id="app-title" class="topbar-title">Battleship</h1>
       <div class="controls">
+        <button id="view-toggle" type="button" aria-pressed="false">3D VIEW</button>
         <button id="new-game" class="new-game" type="button">New game</button>
       </div>
     </header>
 
+    <div id="stage" aria-hidden="true"></div>
     <main>
       <section id="command-screen" class="screen command-screen">
         <p class="eyebrow">Tactical Fleet Command</p>
@@ -36,6 +38,24 @@
             <button type="button" data-mode="salvo">SALVO</button>
           </div>
           <p id="mode-description" class="choice-description"></p>
+        </div>
+        <div class="command-choice">
+          <p class="choice-label">THEATRE</p>
+          <div class="choice-row theatre-row" aria-label="Battle theatre">
+            <button type="button" data-theatre="trafalgar">
+              <img src="/art/trafalgar.png" alt="" aria-hidden="true" />
+              TRAFALGAR <small>1805</small>
+            </button>
+            <button type="button" data-theatre="salamis">
+              <img src="/art/salamis.png" alt="" aria-hidden="true" />
+              SALAMIS <small>480 BC</small>
+            </button>
+            <button type="button" data-theatre="midway">
+              <img src="/art/midway.png" alt="" aria-hidden="true" />
+              MIDWAY <small>1942</small>
+            </button>
+          </div>
+          <p id="theatre-description" class="choice-description"></p>
         </div>
         <button id="mute" type="button" aria-pressed="false" title="Sound on or off">
           <span id="mute-icon" aria-hidden="true">&#128266;</span> <span id="mute-label">Sound on</span>
