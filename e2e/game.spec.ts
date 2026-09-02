@@ -142,6 +142,7 @@ test("resumes the AI turn when reloaded mid-think", async ({ page }) => {
   await page.locator("#ai-board .cell").nth(0).click();
   await page.reload();
   await expect(page.locator("#comms-line")).not.toHaveText("");
+  await expect(page.locator("#status")).toHaveText("Game restored — enemy is returning fire.");
   await expect(page.locator("#status")).toContainText(/The enemy (hit|missed|hit .*sank)/, { timeout: 10_000 });
   await expect(page.locator("#ai-board .cell").nth(99)).toBeEnabled();
 });
