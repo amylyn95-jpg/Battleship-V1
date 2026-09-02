@@ -26,6 +26,21 @@ export interface ProjectileFlight {
   readonly kind: ProjectileKind;
 }
 
+export const TRAIL_PUFF_INTERVAL = 60;
+export const TRAIL_PUFF_DURATION = 700;
+export const TRAIL_PUFF_LIMIT = 24;
+
+export interface TrailPuff {
+  readonly mesh: THREE.Mesh;
+  readonly startedAt: number;
+}
+
+export interface ProjectileTrail {
+  readonly group: THREE.Group;
+  readonly puffs: TrailPuff[];
+  lastSpawnAt: number | null;
+}
+
 function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, name: string): THREE.Mesh {
   const result = new THREE.Mesh(geometry, material);
   result.name = name;
@@ -55,11 +70,52 @@ export function createProjectile(kind: ProjectileKind, from: ArcPoint, to: ArcPo
     group,
     from,
     to,
-    apex: kind === "bomb" ? Math.max(26, from.y + 22) : kind === "bolt" ? 15 : 22,
-    duration: kind === "bomb" ? 1600 : kind === "bolt" ? 900 : 1100,
+    apex: kind === "bomb" ? Math.max(44, from.y + 36) : kind === "bolt" ? 30 : 38,
+    duration: kind === "bomb" ? 1900 : kind === "bolt" ? 1250 : 1500,
     startedAt: now,
     kind,
   };
+}
+
+export function createProjectileTrail(): ProjectileTrail {
+  const group = new THREE.Group();
+  group.name = "projectile-vapour-trail";
+  return { group, puffs: [], lastSpawnAt: null };
+}
+
+export function updateProjectileTrail(
+  trail: ProjectileTrail,
+  point: ArcPoint,
+  now: number,
+  complete: boolean,
+): boolean {
+  if (!complete && (trail.lastSpawnAt === null || now - trail.lastSpawnAt >= TRAIL_PUFF_INTERVAL)) {
+    if (trail.puffs.length < TRAIL_PUFF_LIMIT) {
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(0.5, 8, 6),
+        new THREE.MeshBasicMaterial({ color: "#d8e4e6", transparent: true, opacity: 0.36 }),
+      );
+      puff.position.set(point.x, point.y, point.z);
+      puff.scale.setScalar(0.4);
+      trail.group.add(puff);
+      trail.puffs.push({ mesh: puff, startedAt: now });
+    }
+    trail.lastSpawnAt = now;
+  }
+  for (let index = trail.puffs.length - 1; index >= 0; index--) {
+    const puff = trail.puffs[index]!;
+    const age = now - puff.startedAt;
+    const progress = Math.max(0, Math.min(1, age / TRAIL_PUFF_DURATION));
+    puff.mesh.scale.setScalar(0.4 + progress * 1.7);
+    const material = puff.mesh.material as THREE.MeshBasicMaterial;
+    material.opacity = 0.36 * (1 - progress);
+    if (progress < 1) continue;
+    trail.group.remove(puff.mesh);
+    puff.mesh.geometry.dispose();
+    material.dispose();
+    trail.puffs.splice(index, 1);
+  }
+  return complete && trail.puffs.length === 0;
 }
 
 export function updateProjectile(flight: ProjectileFlight, now: number): boolean {
