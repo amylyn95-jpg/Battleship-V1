@@ -241,7 +241,9 @@ export function createDirector(
       return;
     }
     const flight = createProjectile(theatre.projectile, from, to, performance.now());
-    const trail = !staticMode && rig.trailEnabled ? createProjectileTrail() : null;
+    const trail = !staticMode && rig.trailCapable && !(window.matchMedia?.("(max-width: 700px)").matches ?? false)
+      ? createProjectileTrail()
+      : null;
     rig.scene.add(flight.group);
     if (trail) rig.scene.add(trail.group);
     projectiles.push({ flight, trail, target: new THREE.Vector3(to.x, to.y, to.z), kind, impactStarted: false });
