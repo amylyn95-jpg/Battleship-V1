@@ -16,7 +16,9 @@ export interface Theatre {
   readonly choppy: number;
   readonly projectile: ProjectileKind;
   readonly art: string;
-  readonly blurb: string;
+  readonly enemy: string;
+  readonly teaser: string;
+  readonly intro: readonly string[];
 }
 
 export const THEATRES: readonly Theatre[] = [
@@ -34,7 +36,13 @@ export const THEATRES: readonly Theatre[] = [
     choppy: 0.8,
     projectile: "cannonball",
     art: "/art/trafalgar.png",
-    blurb: "Line of battle — sail, smoke and broadside fire.",
+    enemy: "The Combined Fleet",
+    teaser: "France and Spain have joined forces. Break their line before they break yours.",
+    intro: [
+      "The British fleet faces a combined French and Spanish force off Cape Trafalgar.",
+      "Their numbers are formidable. Their line is strong.",
+      "Break the enemy formation, seize the advantage, and decide the fate of the sea.",
+    ],
   },
   {
     id: "salamis",
@@ -50,7 +58,13 @@ export const THEATRES: readonly Theatre[] = [
     choppy: 0.55,
     projectile: "bolt",
     art: "/art/salamis.png",
-    blurb: "Narrow waters — oars, bronze rams and ancient resolve.",
+    enemy: "The Persian Empire",
+    teaser: "The largest fleet in the ancient world is closing in. Draw them into the straits and survive.",
+    intro: [
+      "The Persian Empire has brought overwhelming force to the water.",
+      "In the narrow straits of Salamis, speed and positioning matter more than size.",
+      "Lure the enemy in, outmaneuver the fleet, and fight for survival.",
+    ],
   },
   {
     id: "midway",
@@ -66,7 +80,13 @@ export const THEATRES: readonly Theatre[] = [
     choppy: 0.45,
     projectile: "bomb",
     art: "/art/midway.png",
-    blurb: "Carrier range — steel decks, aircraft and calculated risk.",
+    enemy: "The Imperial Japanese Fleet",
+    teaser: "An enemy carrier force approaches. Find them before they find you.",
+    intro: [
+      "A decisive confrontation is unfolding in the Pacific.",
+      "Enemy carriers are advancing, and the first strike may decide everything.",
+      "Locate the fleet, attack with precision, and turn the tide of the war.",
+    ],
   },
 ];
 

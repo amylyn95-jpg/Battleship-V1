@@ -22,45 +22,52 @@
       <section id="command-screen" class="screen command-screen">
         <p class="eyebrow">Tactical Fleet Command</p>
         <h2>BATTLESHIP</h2>
-        <div class="command-choice">
-          <p class="choice-label">DIFFICULTY</p>
-          <div class="choice-row" aria-label="Difficulty presets">
-            <button type="button" data-difficulty="easy">RECRUIT</button>
-            <button type="button" data-difficulty="normal">TACTICAL</button>
-            <button type="button" data-difficulty="hard">ADMIRAL</button>
-          </div>
-          <p id="difficulty-description" class="choice-description"></p>
-        </div>
-        <div class="command-choice">
-          <p class="choice-label">ENGAGEMENT MODE</p>
-          <div class="choice-row" aria-label="Mode presets">
-            <button type="button" data-mode="classic">CLASSIC</button>
-            <button type="button" data-mode="salvo">SALVO</button>
-          </div>
-          <p id="mode-description" class="choice-description"></p>
-        </div>
-        <div class="command-choice">
-          <p class="choice-label">THEATRE</p>
-          <div class="choice-row theatre-row" aria-label="Battle theatre">
-            <button type="button" data-theatre="trafalgar">
-              <img src="/art/trafalgar.png" alt="" aria-hidden="true" />
-              TRAFALGAR <small>1805</small>
-            </button>
-            <button type="button" data-theatre="salamis">
-              <img src="/art/salamis.png" alt="" aria-hidden="true" />
-              SALAMIS <small>480 BC</small>
-            </button>
-            <button type="button" data-theatre="midway">
-              <img src="/art/midway.png" alt="" aria-hidden="true" />
-              MIDWAY <small>1942</small>
-            </button>
-          </div>
-          <p id="theatre-description" class="choice-description"></p>
+        <p class="campaign-headline">THREE SEAS. THREE ENEMIES. ONE COMMANDER.</p>
+        <p class="campaign-subheadline">Choose a legendary battle and defeat the fleet that changed history.</p>
+        <div id="campaign-cards" class="campaign-cards" role="group" aria-label="Choose a battle"></div>
+        <div class="campaign-crawl">
+          <p>Across three thousand years of naval warfare, the ships have changed. The enemy has changed. The objective has not.</p>
+          <p>Trafalgar. Salamis. Midway.</p>
+          <p>Three battles that changed history. Three enemy fleets waiting beyond the horizon.</p>
+          <p>Your turn to take command.</p>
         </div>
         <button id="mute" type="button" aria-pressed="false" title="Sound on or off">
           <span id="mute-icon" aria-hidden="true">&#128266;</span> <span id="mute-label">Sound on</span>
         </button>
-        <button class="primary" type="button" data-action="deploy">DEPLOY FLEET</button>
+      </section>
+
+      <section id="briefing-screen" class="screen briefing-screen hidden">
+        <img id="briefing-art" class="briefing-art" alt="" aria-hidden="true" />
+        <p class="eyebrow">Mission Briefing</p>
+        <h2 id="briefing-label"></h2>
+        <p id="briefing-years" class="briefing-years"></p>
+        <p id="briefing-enemy" class="briefing-enemy"></p>
+        <div class="briefing-intro">
+          <p id="briefing-intro-1"></p>
+          <p id="briefing-intro-2"></p>
+          <p id="briefing-intro-3"></p>
+        </div>
+        <div class="briefing-choices">
+          <div class="command-choice">
+            <p class="choice-label">DIFFICULTY</p>
+            <div class="choice-row" aria-label="Difficulty presets">
+              <button type="button" data-difficulty="easy">RECRUIT</button>
+              <button type="button" data-difficulty="normal">TACTICAL</button>
+              <button type="button" data-difficulty="hard">ADMIRAL</button>
+            </div>
+            <p id="difficulty-description" class="choice-description"></p>
+          </div>
+          <div class="command-choice">
+            <p class="choice-label">ENGAGEMENT MODE</p>
+            <div class="choice-row" aria-label="Mode presets">
+              <button type="button" data-mode="classic">CLASSIC</button>
+              <button type="button" data-mode="salvo">SALVO</button>
+            </div>
+            <p id="mode-description" class="choice-description"></p>
+          </div>
+        </div>
+        <button class="primary" type="button" data-action="begin-battle">BEGIN BATTLE</button>
+        <button id="back-to-command" class="secondary" type="button">← CHOOSE ANOTHER BATTLE</button>
       </section>
 
       <section id="deploy-screen" class="screen hidden">

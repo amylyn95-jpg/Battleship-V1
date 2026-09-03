@@ -641,7 +641,7 @@ footer {
 }
 
 .command-screen h2 {
-  font-size: clamp(2.75rem, 11vw, 5.5rem);
+  font-size: clamp(1.8rem, 6vw, 3rem);
   letter-spacing: 0.08em;
   margin: 0;
 }
@@ -1330,6 +1330,213 @@ body.shake-heavy {
   box-shadow: 0 0 0 2px rgba(79, 195, 161, 0.18), 0 0 1rem rgba(79, 195, 161, 0.16);
 }
 
+.campaign-headline {
+  max-width: 52rem;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.05rem, 2.7vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.campaign-subheadline {
+  max-width: 42rem;
+  margin: 0;
+  color: #f2f7fa;
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  text-shadow: 0 2px 7px rgba(0, 0, 0, 0.9);
+}
+
+.campaign-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  width: min(100%, 72rem);
+}
+
+.campaign-card {
+  display: grid;
+  grid-template-rows: 10rem 1fr;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(79, 195, 161, 0.7);
+  border-radius: 10px;
+  background: rgba(5, 25, 45, 0.9);
+  text-align: left;
+  box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.28);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.campaign-card:hover,
+.campaign-card:focus-visible,
+.campaign-card.selected {
+  border-color: var(--target);
+  box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.2), 0 0.8rem 2rem rgba(0, 0, 0, 0.38);
+}
+
+.campaign-card:hover {
+  transform: translateY(-0.2rem);
+}
+
+.campaign-card > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.82;
+}
+
+.campaign-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.75rem;
+  background: rgba(5, 25, 45, 0.94);
+}
+
+.campaign-card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.campaign-card-heading small {
+  flex-shrink: 0;
+  color: var(--target);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.campaign-card-enemy {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.campaign-card-teaser {
+  flex: 1;
+  color: #f2f7fa;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.campaign-card-cta {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.campaign-crawl {
+  width: min(100%, 55rem);
+  padding: 0.5rem 0.75rem;
+  color: #e3edf1;
+  font-family: "IM Fell English", Georgia, serif;
+  font-size: 0.86rem;
+  font-style: italic;
+  line-height: 1.35;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+}
+
+.campaign-crawl p {
+  margin: 0.15rem 0;
+}
+
+.briefing-screen {
+  width: min(100%, 54rem);
+  padding: 1.25rem;
+  border: 1px solid rgba(79, 195, 161, 0.62);
+  border-radius: 12px;
+  background: rgba(5, 25, 45, 0.9);
+  text-align: center;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
+}
+
+body[data-screen="briefing"] main {
+  min-height: calc(100vh - 8rem);
+  justify-content: center;
+}
+
+.briefing-art {
+  display: block;
+  width: calc(100% + 2.5rem);
+  height: 8rem;
+  margin: -1.25rem -1.25rem 1rem;
+  object-fit: cover;
+  opacity: 0.42;
+  filter: saturate(0.85) contrast(1.1);
+}
+
+.briefing-screen h2 {
+  margin: 0.2rem 0 0;
+  color: #ffffff;
+  font-family: "IM Fell English", Georgia, serif;
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.briefing-years,
+.briefing-enemy {
+  margin: 0.25rem 0 0;
+  color: var(--target);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.briefing-enemy {
+  color: var(--accent);
+}
+
+.briefing-intro {
+  max-width: 40rem;
+  margin: 1rem auto;
+  color: #f2f7fa;
+  font-size: 1rem;
+  line-height: 1.5;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+}
+
+.briefing-intro p {
+  margin: 0.45rem 0;
+}
+
+.briefing-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem auto 0;
+  max-width: 44rem;
+}
+
+.briefing-choices .command-choice {
+  width: 100%;
+}
+
+.secondary {
+  margin-top: 0.75rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--miss);
+}
+
 @keyframes command-radar {
   to {
     transform: translate(-50%, -50%) rotate(360deg);
@@ -1339,5 +1546,48 @@ body.shake-heavy {
 @media (prefers-reduced-motion: reduce) {
   .command-screen::before {
     animation: none;
+  }
+
+  .campaign-card {
+    transition: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .command-screen {
+    min-height: auto;
+    padding: 0.5rem 0;
+  }
+
+  .campaign-cards {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .campaign-card {
+    grid-template-rows: 7rem 1fr;
+  }
+
+  .briefing-screen {
+    min-height: auto;
+    padding: 0.9rem;
+  }
+
+  .briefing-art {
+    width: calc(100% + 1.8rem);
+    height: 6.5rem;
+    margin: -0.9rem -0.9rem 0.75rem;
+  }
+
+  .briefing-choices {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .command-screen > .eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
   }
 }

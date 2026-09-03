@@ -11,6 +11,10 @@ describe("battle theatres", () => {
       expect(theatre.sky).toMatch(/^#/);
       expect(theatre.fog).toMatch(/^#/);
       expect(["bolt", "cannonball", "bomb"]).toContain(theatre.projectile);
+      expect(theatre.enemy).toBeTruthy();
+      expect(theatre.teaser).toBeTruthy();
+      expect(theatre.intro.length).toBeGreaterThanOrEqual(3);
+      expect(theatre.intro.every((line) => line.trim().length > 0)).toBe(true);
       expect(existsSync(new URL(`../public${theatre.art}`, import.meta.url))).toBe(true);
     }
   });
