@@ -9,7 +9,8 @@ import { BOARD_SIZE, FLEET } from "./types.js";
 import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult, TheatreId } from "./types.js";
 import { buildGrid, cellIndex, clearPreview, coordLabel, paintCoordinates, showPreview } from "./ui.js";
 import { isMuted, playFire, playHit, playLaunch, playLose, playMiss, playRadio, playSonar, playSunk, playWin, setMuted } from "./sound.js";
-import { renderCommand } from "./views/command.js";
+import { buildCampaignCards, renderCommand } from "./views/command.js";
+import { renderBriefing } from "./views/briefing.js";
 import { renderDeploy, setupDeployDrag } from "./views/deploy.js";
 import { describe, describeSalvo, logText, renderBattle } from "./views/battle.js";
 import { renderDebrief } from "./views/debrief.js";
@@ -27,8 +28,20 @@ function required<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
+buildCampaignCards(required<HTMLElement>("campaign-cards"));
+
 const dom = {
   command: required<HTMLElement>("command-screen"),
+  briefing: required<HTMLElement>("briefing-screen"),
+  briefingLabel: required<HTMLElement>("briefing-label"),
+  briefingYears: required<HTMLElement>("briefing-years"),
+  briefingEnemy: required<HTMLElement>("briefing-enemy"),
+  briefingIntro: [
+    required<HTMLElement>("briefing-intro-1"),
+    required<HTMLElement>("briefing-intro-2"),
+    required<HTMLElement>("briefing-intro-3"),
+  ],
+  backToCommand: required<HTMLButtonElement>("back-to-command"),
   stage: required<HTMLElement>("stage"),
   topbarTitle: required<HTMLHeadingElement>("app-title"),
   difficultyButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")],
@@ -36,7 +49,6 @@ const dom = {
   theatreButtons: [...document.querySelectorAll<HTMLButtonElement>("[data-theatre]")],
   difficultyDescription: required<HTMLElement>("difficulty-description"),
   modeDescription: required<HTMLElement>("mode-description"),
-  theatreDescription: required<HTMLElement>("theatre-description"),
   deploy: required<HTMLElement>("deploy-screen"),
   battle: required<HTMLElement>("battle-screen"),
   boardArea: required<HTMLElement>("board-area"),
@@ -75,6 +87,7 @@ const dom = {
   rematch: required<HTMLButtonElement>("rematch"),
   newBattle: required<HTMLButtonElement>("new-battle"),
   changeDifficulty: required<HTMLButtonElement>("change-difficulty"),
+  beginBattle: document.querySelector<HTMLButtonElement>("[data-action='begin-battle']")!,
   turnBanner: required<HTMLElement>("turn-banner"),
   targetReadout: required<HTMLElement>("target-readout"),
   battleLog: required<HTMLUListElement>("battle-log"),
@@ -223,15 +236,24 @@ function render(): void {
   renderCommand(
     {
       root: dom.command,
-      mute: dom.mute,
-      difficultyButtons: dom.difficultyButtons,
-      modeButtons: dom.modeButtons,
       theatreButtons: dom.theatreButtons,
-      difficultyDescription: dom.difficultyDescription,
-      modeDescription: dom.modeDescription,
-      theatreDescription: dom.theatreDescription,
     },
     screen === "command",
+    session.theatre,
+  );
+  renderBriefing(
+    {
+      root: dom.briefing,
+      label: dom.briefingLabel,
+      years: dom.briefingYears,
+      enemy: dom.briefingEnemy,
+      intro: dom.briefingIntro,
+      difficultyButtons: dom.difficultyButtons,
+      modeButtons: dom.modeButtons,
+      difficultyDescription: dom.difficultyDescription,
+      modeDescription: dom.modeDescription,
+    },
+    screen === "briefing",
     session.difficulty,
     session.mode,
     session.theatre,
@@ -294,11 +316,11 @@ function render(): void {
   director?.syncBoards(session, screen, session.phase === "gameover");
   dom.topbarTitle.classList.toggle("hidden", screen === "command");
   dom.newGame.classList.toggle("hidden", screen === "command");
-  dom.boardArea.classList.toggle("hidden", screen === "command");
-  dom.playerWrap.classList.toggle("hidden", screen === "command");
-  dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy");
-  dom.steps.classList.toggle("hidden", screen === "command");
-  dom.status.classList.toggle("hidden", screen === "command");
+  dom.boardArea.classList.toggle("hidden", screen === "command" || screen === "briefing");
+  dom.playerWrap.classList.toggle("hidden", screen === "command" || screen === "briefing");
+  dom.aiWrap.classList.toggle("hidden", screen === "command" || screen === "deploy" || screen === "briefing");
+  dom.steps.classList.toggle("hidden", screen === "command" || screen === "briefing");
+  dom.status.classList.toggle("hidden", screen === "command" || screen === "briefing");
   dom.footerHint.classList.toggle("hidden", screen !== "battle");
   const enteringDebrief = screen === "debrief" && renderedScreen !== "debrief";
   renderDebrief(
@@ -549,15 +571,20 @@ for (const button of dom.theatreButtons) {
   button.addEventListener("click", () => {
     session.theatre = button.dataset.theatre as TheatreId;
     director?.setTheatre(session.theatre);
+    screen = "briefing";
     render();
   });
 }
 dom.viewToggle.addEventListener("click", () => {
   void setViewMode(viewMode === "3d" ? "classic" : "3d");
 });
-dom.command.querySelector<HTMLButtonElement>("[data-action='deploy']")!.addEventListener("click", () => {
+dom.beginBattle.addEventListener("click", () => {
   screen = "deploy";
   setStatus("Place your fleet to begin.");
+  render();
+});
+dom.backToCommand.addEventListener("click", () => {
+  screen = "command";
   render();
 });
 dom.rotate.addEventListener("click", () => {
@@ -598,7 +625,7 @@ dom.newGame.addEventListener("click", () => resetGame(session.difficulty, sessio
 dom.rematch.addEventListener("click", () => resetGame(session.difficulty, session.mode));
 dom.newBattle.addEventListener("click", () => resetGame(session.difficulty, session.mode, "command"));
 dom.changeDifficulty.addEventListener("click", () => {
-  resetGame(session.difficulty, session.mode, "command");
+  resetGame(session.difficulty, session.mode, "briefing");
   window.setTimeout(() => dom.difficultyButtons[0]?.focus(), 0);
 });
 

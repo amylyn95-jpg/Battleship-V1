@@ -257,7 +257,7 @@ export function createDirector(
       rig.render(true);
     },
     syncBoards(session, screen, revealEnemy): void {
-      const activeRig = screen === "command" || screen === "deploy" || screen === "debrief"
+      const activeRig = screen === "command" || screen === "briefing" || screen === "deploy" || screen === "debrief"
         ? "overview"
         : session.turn === "ai" ? "own" : "player";
       rig.setRig(activeRig);
@@ -276,11 +276,11 @@ export function createDirector(
         session.playerBoard.ships.map((ship) => [ship.id, ship.hits.length]),
         revealEnemy ? session.aiBoard.ships.map((ship) => [ship.id, ship.hits.length]) : [],
         revealEnemy,
-        screen !== "command",
+        screen !== "command" && screen !== "briefing",
         theatre.id,
       ]);
       if (boardKey !== fleetSignature) {
-        renderFleet(session.playerBoard, "player", screen !== "command");
+        renderFleet(session.playerBoard, "player", screen !== "command" && screen !== "briefing");
         renderFleet(session.aiBoard, "enemy", revealEnemy);
         fleetSignature = boardKey;
       }

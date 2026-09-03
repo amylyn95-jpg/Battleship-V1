@@ -18,8 +18,14 @@ test.afterEach(() => {
   expect(consoleErrors.get(test.info()) ?? []).toEqual([]);
 });
 
+async function chooseBattle(page: Page, theatre = "trafalgar"): Promise<void> {
+  await page.locator(`#campaign-cards [data-theatre="${theatre}"]`).click();
+  await expect(page.locator("#briefing-screen")).toBeVisible();
+}
+
 async function enterDeployment(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "DEPLOY FLEET" }).click();
+  await chooseBattle(page);
+  await page.getByRole("button", { name: "BEGIN BATTLE" }).click();
   await expect(page.locator("#deploy-screen")).toBeVisible();
   await expect(page.locator("#ai-wrap")).toBeHidden();
   await expect(page.locator("#footer-hint")).toBeHidden();
@@ -35,25 +41,49 @@ async function engage(page: Page): Promise<void> {
 
 test("passes through the command screen", async ({ page }) => {
   await expect(page.locator("#command-screen")).toBeVisible();
+  await expect(page.locator("#campaign-cards [data-theatre]")).toHaveCount(3);
   await expect(page.locator("#stage canvas")).toHaveCount(0);
   await expect(page.locator("#app-title")).toBeHidden();
   await expect(page.locator("#new-game")).toBeHidden();
   await expect(page.locator("#footer-hint")).toBeHidden();
+  await chooseBattle(page);
   await page.getByRole("button", { name: "ADMIRAL" }).click();
   await expect(page.locator("#difficulty-description")).toContainText("Probability targeting");
   await expect(page.locator("#mode-description")).toContainText("Classic engagement");
-  await page.getByRole("button", { name: /MIDWAY/ }).click();
-  await expect(page.locator("#theatre-description")).toContainText("Carrier range");
   await page.getByRole("button", { name: "3D VIEW" }).click();
   await expect(page.locator("#stage canvas")).toHaveCount(1);
   await page.getByRole("button", { name: "CLASSIC VIEW" }).click();
   await expect(page.locator("#stage canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "3D VIEW" }).click();
   await expect(page.locator("#stage canvas")).toHaveCount(1);
-  await page.getByRole("button", { name: "DEPLOY FLEET" }).click();
+  await page.getByRole("button", { name: "BEGIN BATTLE" }).click();
   await expect(page.locator("#app-title")).toBeVisible();
   await expect(page.locator("#new-game")).toBeVisible();
   await expect(page.locator("#placement-prompt")).toContainText("Carrier");
+});
+
+test("shows campaign cards and each theatre briefing", async ({ page }) => {
+  const battles = [
+    ["trafalgar", "TRAFALGAR", "1805", "The Combined Fleet", "The British fleet faces a combined French and Spanish force off Cape Trafalgar."],
+    ["salamis", "SALAMIS", "480 BC", "The Persian Empire", "The Persian Empire has brought overwhelming force to the water."],
+    ["midway", "MIDWAY", "1942", "The Imperial Japanese Fleet", "A decisive confrontation is unfolding in the Pacific."],
+  ] as const;
+  for (const [id, label, years, enemy, intro] of battles) {
+    const card = page.locator(`#campaign-cards [data-theatre="${id}"]`);
+    await expect(card).toContainText(label);
+    await expect(card).toContainText(years);
+    await expect(card).toContainText(`Enemy: ${enemy}`);
+    await expect(card).toContainText(id === "trafalgar"
+      ? "France and Spain have joined forces."
+      : id === "salamis"
+        ? "The largest fleet in the ancient world is closing in."
+        : "An enemy carrier force approaches.");
+    await card.click();
+    await expect(page.locator("#briefing-screen")).toBeVisible();
+    await expect(page.locator("#briefing-intro-1")).toHaveText(intro);
+    await page.getByRole("button", { name: /CHOOSE ANOTHER BATTLE/ }).click();
+    await expect(page.locator("#command-screen")).toBeVisible();
+  }
 });
 
 test("random fleet, engage, fire and see feedback", async ({ page }) => {
@@ -148,8 +178,12 @@ test("resumes the AI turn when reloaded mid-think", async ({ page }) => {
 });
 
 test("salvo mode fires five shots at once and reports only a hit count", async ({ page }) => {
+  await chooseBattle(page);
   await page.getByRole("button", { name: "SALVO" }).click();
-  await engage(page);
+  await page.getByRole("button", { name: "BEGIN BATTLE" }).click();
+  await expect(page.locator("#deploy-screen")).toBeVisible();
+  await page.getByRole("button", { name: "Random fleet" }).click();
+  await page.getByRole("button", { name: "ENGAGE ENEMY" }).click();
   await expect(page.locator("#salvo-bar")).toBeVisible();
   await expect(page.locator("#salvo-count")).toHaveText("Targets 0/5");
   const enemy = page.locator("#ai-board .cell");

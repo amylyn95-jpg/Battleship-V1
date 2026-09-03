@@ -1,1 +1,1 @@
-export type Screen = "command" | "deploy" | "battle" | "debrief";
+export type Screen = "command" | "briefing" | "deploy" | "battle" | "debrief";
