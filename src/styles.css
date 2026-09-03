@@ -1433,6 +1433,7 @@ body.shake-heavy {
 
 .campaign-card-cta {
   align-self: flex-start;
+  margin-top: auto;
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--accent);
   border-radius: 999px;
@@ -1459,13 +1460,27 @@ body.shake-heavy {
 
 .briefing-screen {
   width: min(100%, 54rem);
-  min-height: calc(100vh - 8rem);
   padding: 1.25rem;
   border: 1px solid rgba(79, 195, 161, 0.62);
   border-radius: 12px;
   background: rgba(5, 25, 45, 0.9);
   text-align: center;
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
+}
+
+body[data-screen="briefing"] main {
+  min-height: calc(100vh - 8rem);
+  justify-content: center;
+}
+
+.briefing-art {
+  display: block;
+  width: calc(100% + 2.5rem);
+  height: 8rem;
+  margin: -1.25rem -1.25rem 1rem;
+  object-fit: cover;
+  opacity: 0.42;
+  filter: saturate(0.85) contrast(1.1);
 }
 
 .briefing-screen h2 {
@@ -1558,8 +1573,21 @@ body.shake-heavy {
     padding: 0.9rem;
   }
 
+  .briefing-art {
+    width: calc(100% + 1.8rem);
+    height: 6.5rem;
+    margin: -0.9rem -0.9rem 0.75rem;
+  }
+
   .briefing-choices {
     grid-template-columns: 1fr;
     gap: 0.6rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .command-screen > .eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
   }
 }

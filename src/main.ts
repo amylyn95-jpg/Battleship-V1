@@ -33,6 +33,7 @@ buildCampaignCards(required<HTMLElement>("campaign-cards"));
 const dom = {
   command: required<HTMLElement>("command-screen"),
   briefing: required<HTMLElement>("briefing-screen"),
+  briefingArt: required<HTMLImageElement>("briefing-art"),
   briefingLabel: required<HTMLElement>("briefing-label"),
   briefingYears: required<HTMLElement>("briefing-years"),
   briefingEnemy: required<HTMLElement>("briefing-enemy"),
@@ -244,6 +245,7 @@ function render(): void {
   renderBriefing(
     {
       root: dom.briefing,
+      art: dom.briefingArt,
       label: dom.briefingLabel,
       years: dom.briefingYears,
       enemy: dom.briefingEnemy,

@@ -3,6 +3,7 @@ import { theatreConfig } from "../three/theatres.js";
 
 export interface BriefingViewDom {
   root: HTMLElement;
+  art: HTMLImageElement;
   label: HTMLElement;
   years: HTMLElement;
   enemy: HTMLElement;
@@ -34,6 +35,7 @@ export function renderBriefing(
   dom.root.classList.toggle("hidden", !visible);
   if (!visible) return;
   const selected = theatreConfig(theatre);
+  dom.art.src = selected.art;
   dom.label.textContent = selected.label;
   dom.years.textContent = selected.years;
   dom.enemy.textContent = `Enemy: ${selected.enemy}`;
