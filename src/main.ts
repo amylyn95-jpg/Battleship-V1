@@ -340,7 +340,7 @@ function render(): void {
     enteringDebrief,
   );
   renderedScreen = screen;
-  if (screen !== "command") save(session);
+  if (screen !== "command" && screen !== "briefing") save(session);
 }
 
 async function setViewMode(next: ViewMode): Promise<void> {

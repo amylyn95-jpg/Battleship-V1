@@ -86,6 +86,13 @@ test("shows campaign cards and each theatre briefing", async ({ page }) => {
   }
 });
 
+test("does not autosave an unfinished briefing on reload", async ({ page }) => {
+  await chooseBattle(page);
+  await page.reload();
+  await expect(page.locator("#command-screen")).toBeVisible();
+  await expect(page.locator("#deploy-screen")).toBeHidden();
+});
+
 test("random fleet, engage, fire and see feedback", async ({ page }) => {
   await engage(page);
   await expect(page.locator("#player-board .cell:not([disabled])")).toHaveCount(0);
