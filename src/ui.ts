@@ -139,11 +139,15 @@ export function showTargets(
   for (const coord of coords) cells[cellIndex(coord)]?.classList.add("target");
 }
 
-export function paintFleet(list: HTMLElement, ships: readonly Ship[]): void {
+export function paintFleet(
+  list: HTMLElement,
+  ships: readonly Ship[],
+  name: (id: ShipId) => string = (id) => FLEET.find((s) => s.id === id)!.name,
+): void {
   list.textContent = "";
   for (const ship of ships) {
     const item = document.createElement("li");
-    item.textContent = `${ship.name} (${ship.length})`;
+    item.textContent = `${name(ship.id)} (${ship.length})`;
     item.classList.toggle("sunk", isSunk(ship));
     list.append(item);
   }
@@ -153,7 +157,12 @@ export function paintFleet(list: HTMLElement, ships: readonly Ship[]): void {
  * The placement dock: every ship in the fleet, marked as placed or as the one
  * being placed now, so it is obvious what is left before the battle can start.
  */
-export function paintDock(dock: HTMLElement, board: Board, nextId: ShipId | null): void {
+export function paintDock(
+  dock: HTMLElement,
+  board: Board,
+  nextId: ShipId | null,
+  name: (id: ShipId) => string = (id) => FLEET.find((s) => s.id === id)!.name,
+): void {
   dock.textContent = "";
   const placed = new Set(board.ships.map((ship) => ship.id));
   for (const spec of FLEET) {
@@ -168,7 +177,7 @@ export function paintDock(dock: HTMLElement, board: Board, nextId: ShipId | null
     silhouette.setAttribute("aria-hidden", "true");
 
     const label = document.createElement("span");
-    label.textContent = `${spec.name} (${spec.length})`;
+    label.textContent = `${name(spec.id)} (${spec.length})`;
 
     item.append(silhouette, label);
     dock.append(item);

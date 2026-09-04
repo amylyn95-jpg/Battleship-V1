@@ -17,7 +17,7 @@ import {
   toggleTarget,
 } from "./session.js";
 import { BOARD_SIZE, FLEET } from "./types.js";
-import type { Coord, Difficulty, Mode, Orientation, Phase, ShotResult } from "./types.js";
+import type { Coord, Difficulty, Mode, Orientation, Phase, ShipId, ShotResult } from "./types.js";
 import {
   buildGrid,
   cellIndex,
@@ -31,6 +31,7 @@ import {
 } from "./ui.js";
 import {
   isMuted,
+  setSoundTheatre,
   playFire,
   playHit,
   playLose,
@@ -47,8 +48,17 @@ import {
   saveStats,
   winRate,
 } from "./stats.js";
+import {
+  DEFAULT_THEATRE,
+  isTheatreId,
+  loadTheatre,
+  saveTheatre,
+  shipName,
+  theatre,
+} from "./theatre.js";
 import type { Session } from "./session.js";
 import type { Stats } from "./stats.js";
+import type { Theatre, TheatreId } from "./theatre.js";
 
 /** Pause between the enemy settling on a cell and the shot landing. */
 const AI_THINK_MS = 160;
@@ -83,6 +93,7 @@ const dom = {
   stepPlace: required<HTMLLIElement>("step-place"),
   stepStart: required<HTMLLIElement>("step-start"),
   stepFire: required<HTMLLIElement>("step-fire"),
+  stepFireLabel: required<HTMLSpanElement>("step-fire-label"),
   mute: required<HTMLButtonElement>("mute"),
   muteIcon: required<HTMLSpanElement>("mute-icon"),
   muteLabel: required<HTMLSpanElement>("mute-label"),
@@ -103,9 +114,14 @@ const dom = {
   statsBreakdown: required<HTMLDivElement>("stats-breakdown"),
   statsRows: required<HTMLTableSectionElement>("stats-rows"),
   statsReset: required<HTMLButtonElement>("stats-reset"),
+  theatre: required<HTMLSelectElement>("theatre"),
+  theatrePlace: required<HTMLElement>("theatre-place"),
+  playerHeading: required<HTMLHeadingElement>("player-heading"),
+  aiHeading: required<HTMLHeadingElement>("ai-heading"),
 };
 
 let session: Session = load() ?? newSession("normal");
+let scene: Theatre = theatre(loadTheatre());
 let stats: Stats = loadStats();
 let orientation: Orientation = "horizontal";
 let cursor: Coord = { row: 0, col: 0 };
@@ -122,6 +138,27 @@ const aiCells = buildGrid(dom.aiBoard, handleFireClick);
 
 dom.difficulty.value = session.difficulty;
 dom.mode.value = session.mode;
+
+/** Era name for one of the five hulls in the active theatre. */
+function hullName(id: ShipId): string {
+  return shipName(scene.id, id);
+}
+
+/**
+ * Repaints the page for the chosen theatre. The body attribute drives every
+ * palette and the landscape band in CSS; the rest is wording, so no game state
+ * is touched and a battle in progress carries straight over.
+ */
+function applyTheatre(id: TheatreId): void {
+  scene = theatre(id);
+  document.body.dataset.theatre = id;
+  dom.theatre.value = id;
+  dom.theatrePlace.textContent = scene.place;
+  dom.playerHeading.textContent = scene.yourWaters;
+  dom.aiHeading.textContent = scene.enemyWaters;
+  dom.stepFireLabel.textContent = `Fire at ${scene.enemyWaters.toLowerCase()}`;
+  setSoundTheatre(id);
+}
 
 function setStatus(html: string): void {
   dom.status.innerHTML = html;
@@ -252,24 +289,27 @@ function playResults(results: readonly ShotResult[]): void {
  */
 function describeSalvo(results: readonly ShotResult[], actor: "Your" | "Enemy"): string {
   const hits = results.filter((r) => r.hit).length;
-  const sunk = results.filter((r) => r.sunk).map((r) => r.sunk!.name);
+  const sunk = results.filter((r) => r.sunk).map((r) => hullName(r.sunk!.id));
   const tally =
     hits === 0
-      ? `${actor} salvo of ${results.length}: all misses.`
-      : `${actor} salvo of ${results.length}: <span class="hit-text">${hits} hit${hits === 1 ? "" : "s"}</span>!`;
+      ? `${actor} ${scene.volley} of ${results.length}: all misses.`
+      : `${actor} ${scene.volley} of ${results.length}: <span class="hit-text">${hits} hit${hits === 1 ? "" : "s"}</span>!`;
   if (sunk.length === 0) return tally;
   const owner = actor === "Your" ? "Sank the" : "They sank your";
   return `${tally} <span class="sunk-text">${owner} ${sunk.join(" and ")}</span>!`;
 }
 
-function describe(result: ShotResult, actor: "You" | "The enemy"): string {
+function describe(result: ShotResult, side: "you" | "enemy"): string {
   const where = coordLabel(result.coord);
+  const actor = side === "you" ? "You" : scene.opponent;
   if (result.sunk) {
-    const verb = actor === "You" ? "sank" : "sank your";
-    return `${actor} hit ${where} and <span class="sunk-text">${verb} ${result.sunk.name}</span>!`;
+    const verb = side === "you" ? "sank" : "sank your";
+    return `${actor} ${scene.hitWord} ${where} and <span class="sunk-text">${verb} ${hullName(result.sunk.id)}</span>!`;
   }
-  if (result.hit) return `${actor} <span class="hit-text">hit</span> at ${where}.`;
-  return `${actor} missed at ${where}.`;
+  if (result.hit) {
+    return `${actor} <span class="hit-text">${scene.hitWord}</span> ${where}.`;
+  }
+  return `${actor} ${scene.missWord} at ${where}.`;
 }
 
 function currentPhase(): Phase {
@@ -300,8 +340,8 @@ function render(): void {
     salvo,
   );
   if (salvo) showTargets(aiCells, session.pendingTargets);
-  paintFleet(dom.playerFleet, session.playerBoard.ships);
-  paintFleet(dom.aiFleet, session.aiBoard.ships);
+  paintFleet(dom.playerFleet, session.playerBoard.ships, hullName);
+  paintFleet(dom.aiFleet, session.aiBoard.ships, hullName);
 
   const placing = session.phase === "placement";
   dom.placementPanel.classList.toggle("hidden", !placing);
@@ -320,9 +360,9 @@ function render(): void {
   if (placing) {
     const next = nextShipToPlace(session);
     dom.placementPrompt.textContent = next
-      ? `Place your ${next.name} (${next.length} cells, ${orientation}) — click a square on your waters.`
+      ? `Place your ${hullName(next.id)} (${next.length} cells, ${orientation}) — click a square on ${scene.yourWaters.toLowerCase()}.`
       : "Fleet ready. Start the battle!";
-    paintDock(dom.dock, session.playerBoard, next?.id ?? null);
+    paintDock(dom.dock, session.playerBoard, next?.id ?? null, hullName);
     const left = FLEET.length - session.playerBoard.ships.length;
     dom.startHint.textContent = ready
       ? ""
@@ -354,7 +394,7 @@ function render(): void {
     const acc = Math.round(accuracy(session.aiBoard) * 100);
     dom.gameoverStats.textContent = playerWon
       ? `You won in ${shots} shots (${acc}% accuracy).`
-      : `The enemy sank your fleet in ${shotsFired(session.playerBoard)} shots. You fired ${shots} (${acc}% accuracy).`;
+      : `${scene.opponent} sank your fleet in ${shotsFired(session.playerBoard)} shots. You fired ${shots} (${acc}% accuracy).`;
     dom.gameoverRecord.textContent = `Record: ${stats.wins}W - ${stats.losses}L | streak ${stats.currentStreak} (best ${stats.bestStreak}).`;
     dom.rematch.focus();
   }
@@ -367,12 +407,16 @@ function handlePlacementClick(coord: Coord): void {
   const spec = nextShipToPlace(session);
   if (!spec) return;
   if (!canPlace(session.playerBoard, spec, coord, orientation)) {
-    setStatus(`The ${spec.name} does not fit there.`);
+    setStatus(`The ${hullName(spec.id)} does not fit there.`);
     return;
   }
   session.playerBoard = placeShip(session.playerBoard, spec, coord, orientation);
   const next = nextShipToPlace(session);
-  setStatus(next ? `${spec.name} placed. Next: ${next.name}.` : "Fleet ready — start the battle.");
+  setStatus(
+    next
+      ? `${hullName(spec.id)} placed. Next: ${hullName(next.id)}.`
+      : "Fleet ready — start the battle.",
+  );
   clearPreview(playerCells);
   render();
 }
@@ -443,7 +487,7 @@ function handleFireClick(coord: Coord): void {
     return;
   }
   playResults([result]);
-  setStatus(describe(result, "You"));
+  setStatus(describe(result, "you"));
   if (finishedNow()) {
     render();
     return;
@@ -456,7 +500,7 @@ function scheduleAiTurn(): void {
   aiThinking = true;
   render();
   const scanMs = showScan();
-  appendStatus("The enemy is scanning your waters&hellip;");
+  appendStatus(scene.scanNote);
   window.setTimeout(() => {
     aiThinking = false;
     clearScan();
@@ -477,7 +521,7 @@ function scheduleAiTurn(): void {
     }
     const result = aiFire(session);
     playResults([result]);
-    setStatus(describe(result, "The enemy"));
+    setStatus(describe(result, "enemy"));
     finishedNow();
     render();
   }, AI_THINK_MS + scanMs);
@@ -523,7 +567,7 @@ dom.startBattle.addEventListener("click", () => {
   setStatus(
     session.mode === "salvo"
       ? "Battle stations — pick one target per surviving ship, then fire."
-      : "Battle stations — fire at the enemy waters.",
+      : `Battle stations — fire at ${scene.enemyWaters.toLowerCase()}.`,
   );
   render();
   startClock();
@@ -542,6 +586,14 @@ dom.statsReset.addEventListener("click", () => {
   stats = loadStats();
   renderStats();
   setStatus("Record cleared.");
+});
+
+dom.theatre.addEventListener("change", () => {
+  const id = isTheatreId(dom.theatre.value) ? dom.theatre.value : DEFAULT_THEATRE;
+  applyTheatre(id);
+  saveTheatre(id);
+  setStatus(`Theatre: ${scene.label} — ${scene.place}.`);
+  render();
 });
 
 dom.mute.addEventListener("click", () => {
@@ -628,13 +680,14 @@ document.addEventListener("keydown", (event) => {
   board[cellIndex(next)]!.focus();
 });
 
+applyTheatre(scene.id);
 showMuteState();
 renderStats();
 setStatus(
   session.phase === "placement"
     ? "Place your fleet to begin."
     : session.phase === "playing"
-      ? "Game restored — fire at the enemy waters."
+      ? `Game restored — fire at ${scene.enemyWaters.toLowerCase()}.`
       : "Game over.",
 );
 render();
