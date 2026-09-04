@@ -71,6 +71,13 @@ describe("theatres", () => {
     expect(isTheatreId("mekong")).toBe(true);
   });
 
+  it("rejects inherited object keys saved as a theatre", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("battleship.theatre", "toString");
+    expect(isTheatreId("toString")).toBe(false);
+    expect(loadTheatre(storage)).toBe(DEFAULT_THEATRE);
+  });
+
   it("keeps the engine's ship ids and lengths identical in every theatre", () => {
     for (const scene of THEATRE_LIST) {
       expect(Object.keys(theatre(scene.id).ships).sort()).toEqual(

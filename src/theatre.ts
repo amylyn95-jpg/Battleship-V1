@@ -118,7 +118,7 @@ export const THEATRE_LIST: readonly Theatre[] = [
 export const DEFAULT_THEATRE: TheatreId = "pacific";
 
 export function isTheatreId(value: unknown): value is TheatreId {
-  return typeof value === "string" && value in THEATRES;
+  return typeof value === "string" && Object.hasOwn(THEATRES, value);
 }
 
 export function theatre(id: TheatreId): Theatre {

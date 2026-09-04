@@ -826,6 +826,7 @@ footer {
 @media (max-width: 620px) {
   :root {
     --cell: min(8.4vw, 34px);
+    --horizon-height: 70px;
   }
 
   body {
@@ -857,10 +858,6 @@ footer {
   #start-battle {
     min-height: 2.5rem;
   }
-
-  .horizon {
-    height: 70px;
-  }
 }
 
 /* ---- Theatres ----------------------------------------------------------
@@ -879,7 +876,7 @@ footer {
    front, sized to the band so it always meets the horizon. */
 .horizon {
   width: 100%;
-  height: 108px;
+  height: var(--horizon-height, 108px);
   border: 1px solid var(--grid-line);
   border-radius: 8px;
   background:
